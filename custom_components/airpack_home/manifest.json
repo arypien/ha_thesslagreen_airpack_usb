@@ -1,7 +1,7 @@
 {
   "domain": "airpack_home",
   "name": "AirPack Home (Theslagreen)",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "documentation": "https://github.com/theslagreen/airpack-home-ha",
   "issue_tracker": "https://github.com/theslagreen/airpack-home-ha/issues",
   "requirements": [
