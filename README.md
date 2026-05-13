@@ -32,7 +32,7 @@ Integration for **Theslagreen AirPack Home** heat recovery units (all h/v/f Ener
 
 ---
 
-# AirPack Home – Integracja Home Assistant
+# AirPack Home – Integracja Home Assistant 🇵🇱
 
 Integracja dla rekuperatorów **Theslagreen AirPack Home** (wszystkie modele h/v/f Energy/Energy+) przez protokół **Modbus RTU** (RS485 → USB).
 
@@ -83,3 +83,21 @@ Wszystkie alarmy typu S i E są monitorowane jako sensory binarne.
 
 ## License / Licencja
 MIT
+
+---
+
+## Credits
+
+This integration was developed with the assistance of **MIX AI**.  
+The AI generated the code based on the official Modbus RTU register documentation  
+provided by Theslagreen. Testing, validation and real-world verification  
+was performed by the repository author.
+
+---
+
+## Podziękowania 🇵🇱
+
+Integracja została napisana przy pomocy **MIX AI**.  
+Kod powstał na podstawie oficjalnej dokumentacji rejestrów Modbus RTU  
+dostarczonej przez Theslagreen. Testowanie i weryfikacja na rzeczywistym  
+urządzeniu zostały wykonane przez autora repozytorium.
