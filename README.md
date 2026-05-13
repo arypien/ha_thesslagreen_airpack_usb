@@ -1,6 +1,6 @@
 # AirPack Home – Home Assistant Integration
 
-*(Polska wersja dokumentacji znajduje się poniżej)*
+🇵🇱*(Polska wersja dokumentacji znajduje się poniżej)*🇵🇱
 
 Integration for **Theslagreen AirPack Home** heat recovery units (all h/v/f Energy/Energy+ models) via **Modbus RTU** (RS485 → USB).
 
