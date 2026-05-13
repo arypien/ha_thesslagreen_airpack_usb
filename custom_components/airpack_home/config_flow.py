@@ -111,6 +111,11 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Resolve stable path
         stable_path = await self.hass.async_add_executor_job(get_serial_by_id, device)
         
+        # Check if any existing entry already uses this port
+        for entry in self._async_current_entries():
+            if entry.data.get("port") == stable_path:
+                return self.async_abort(reason="already_configured")
+
         await self.async_set_unique_id(f"airpack_usb_{discovery_info.vid}_{discovery_info.pid}_{discovery_info.serial_number}")
         self._abort_if_unique_id_configured()
         
