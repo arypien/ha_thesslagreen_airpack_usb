@@ -1,5 +1,39 @@
 # AirPack Home – Home Assistant Integration
 
+*(Polska wersja dokumentacji znajduje się poniżej)*
+
+Integration for **Theslagreen AirPack Home** heat recovery units (all h/v/f Energy/Energy+ models) via **Modbus RTU** (RS485 → USB).
+
+## Key Features
+- **Automatic USB Discovery:** The integration automatically detects your connected RS485 adapter.
+- **Stable Connection:** Uses `/dev/serial/by-id/` paths automatically to ensure connectivity persists after reboots.
+- **Full Control:** Supports Fan entity (speed 0-100%), operation modes (Auto/Manual/Boost), bypass control, and schedules.
+- **Diagnostics:** Monitoring of all temperatures, airflow rates (CF), PWM voltages, and a full list of alarms.
+- **Time Sync:** Automatically synchronizes the unit's clock with Home Assistant daily at 03:00.
+
+## Requirements
+- Home Assistant 2024.1.0+
+- RS485 → USB Adapter (e.g., CH340, FTDI, CP210x)
+- RS485 cable connection to the unit
+
+## Installation via HACS
+1. Open HACS → Integrations → **⋮ → Custom repositories**
+2. Add your repository URL, Category: `Integration`
+3. Search for **AirPack Home** and click Install
+4. Restart Home Assistant
+
+## Configuration
+1. Settings → Devices & Services → **Add Integration** → search for "AirPack Home"
+2. If an adapter is connected, it may be discovered automatically. Otherwise, select the port from the dropdown list.
+3. Provide:
+   - **Port**: Select from the list (recommended) or enter manually.
+   - **Modbus Slave ID**: default is `10` (check unit label)
+   - **Baudrate**: default is `9600`
+
+---
+
+# AirPack Home – Integracja Home Assistant
+
 Integracja dla rekuperatorów **Theslagreen AirPack Home** (wszystkie modele h/v/f Energy/Energy+) przez protokół **Modbus RTU** (RS485 → USB).
 
 ## Główne cechy
@@ -7,22 +41,20 @@ Integracja dla rekuperatorów **Theslagreen AirPack Home** (wszystkie modele h/v
 - **Stabilne połączenie:** Automatycznie używa ścieżek `/dev/serial/by-id/`, dzięki czemu nie stracisz połączenia po restarcie serwera.
 - **Pełna kontrola:** Obsługa wentylatora (Fan), trybów pracy (Auto/Manual/Boost), bypassu i harmonogramów.
 - **Diagnostyka:** Odczyt wszystkich temperatur, przepływów (CF), napięć PWM i pełna lista alarmów.
+- **Synchronizacja czasu:** Automatycznie synchronizuje zegar rekuperatora z czasem HA codziennie o 03:00.
 
 ## Wymagania
-
 - Home Assistant 2024.1.0+
 - Adapter RS485 → USB (np. CH340, FTDI, CP210x) podłączony do serwera HA
 - Połączenie z rekuperatorem kablem RS485
 
 ## Instalacja przez HACS
-
 1. Otwórz HACS → Integracje → **⋮ → Repozytoria niestandardowe**
 2. Dodaj URL swojego repozytorium, typ: `Integration`
 3. Wyszukaj **AirPack Home** i kliknij Zainstaluj
 4. Uruchom ponownie Home Assistant
 
 ## Konfiguracja
-
 1. Ustawienia → Urządzenia i usługi → **Dodaj integrację** → szukaj „AirPack Home"
 2. Jeśli masz podłączony adapter, integracja może zostać wykryta automatycznie. Jeśli nie, wybierz port z listy rozwijanej.
 3. Podaj:
@@ -30,42 +62,24 @@ Integracja dla rekuperatorów **Theslagreen AirPack Home** (wszystkie modele h/v
    - **Adres Modbus**: domyślnie `10` (patrz etykieta urządzenia)
    - **Baudrate**: domyślnie `9600`
 
-## Encje
+## Encje / Entities
 
-### 🌬️ Wentylator (Fan)
-Główna encja `fan.airpack_home` pozwala na:
-- Włączanie/wyłączanie rekuperatora.
-- Ustawianie intensywności (0-100%).
-- Wybór trybów: **Automatyczny**, **Manualny**, **Boost (Wietrzenie)**.
+### 🌬️ Fan / Wentylator
+Main entity `fan.airpack_home` / Główna encja:
+- On/Off, Speed 0-100%
+- Preset modes: **Automatyczny (Auto)**, **Manualny (Manual)**, **Boost (Wietrzenie)**.
 
-### 🌡️ Sensory temperatury
-| Encja | Opis |
-|-------|------|
-| `sensor.airpack_home_temperatura_zewnetrzna_tz1` | Temperatura zewnętrzna (TZ1) |
-| `sensor.airpack_home_temperatura_nawiewu_tn1` | Temperatura powietrza nawiewanego |
-| `sensor.airpack_home_temperatura_wywiewu_tp` | Temperatura powietrza wywiewanego |
-| `sensor.airpack_home_sprawnosc_odzysku_ciepla` | Obliczana sprawność rekuperacji (%) |
-| `sensor.airpack_home_temperatura_fpx_tz2` | Temperatura za nagrzewnicą FPX |
-| `sensor.airpack_home_temperatura_otoczenia_to` | Temperatura otoczenia |
+### 🌡️ Temperatures / Temperatury
+- `outside_temperature` (TZ1)
+- `supply_temperature` (TN1)
+- `exhaust_temperature` (TP)
+- `heat_recovery_efficiency` (%)
+- `fpx_temperature` (TZ2)
+- `ambient_temperature` (TO)
 
-### 💨 Sensory przepływu i diagnostyka
-| Encja | Opis |
-|-------|------|
-| `sensor.airpack_home_strumien_nawiewu_cf` | Chwilowy strumień nawiewu (CF) |
-| `sensor.airpack_home_strumien_wywiewu_cf` | Chwilowy strumień wywiewu (CF) |
-| `sensor.airpack_home_napiecie_nawiewu_pwm` | Napięcie sterujące wentylatorem nawiewnym (V) |
-| `sensor.airpack_home_napiecie_wywiewu_pwm` | Napięcie sterujące wentylatorem wywiewnym (V) |
-| `binary_sensor.airpack_home_system_fpx_aktywny` | Status systemu przeciwzamrożeniowego |
+### 🚨 Alarms / Alarmy
+All S-type (blocking) and E-type (warning) alarms are monitored as binary sensors with `problem` device class.
+Wszystkie alarmy typu S i E są monitorowane jako sensory binarne.
 
-### ⚙️ Sterowanie (Select / Switch / Number)
-- **Tryby:** Lato/Zima, EKO/KOMFORT.
-- **Bypass:** Ręczne wymuszanie lub automatyka.
-- **Nastawy:** Czas wietrzenia, progi temperatur, konfiguracja biegów AirS.
-- **Czas:** Integracja automatycznie synchronizuje zegar rekuperatora z czasem HA codziennie o 03:00.
-
-### 🚨 Alarmy (binary_sensor)
-Wszystkie alarmy typu S (blokujące) i E (ostrzeżenia) są monitorowane i widoczne jako osobne sensory binarne z klasą `problem`.
-
-## Licencja
-
+## License / Licencja
 MIT
