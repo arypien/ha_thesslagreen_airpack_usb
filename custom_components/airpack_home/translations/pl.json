@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfiguracja AirPack Home",
+        "description": "Podaj parametry połączenia Modbus RTU (RS485 → USB)",
+        "data": {
+          "port": "Port szeregowy (np. /dev/ttyUSB0)",
+          "slave": "Adres urządzenia Modbus (domyślnie: 10)",
+          "baudrate": "Szybkość transmisji"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się z urządzeniem. Sprawdź port, adres i prędkość transmisji."
+    },
+    "abort": {
+      "already_configured": "To urządzenie jest już skonfigurowane."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje AirPack Home",
+        "data": {
+          "scan_interval": "Interwał odczytu danych (sekundy)"
+        }
+      }
+    }
+  }
+}

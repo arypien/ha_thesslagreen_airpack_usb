@@ -1,0 +1,33 @@
+{
+  "domain": "airpack_home",
+  "name": "AirPack Home (Theslagreen)",
+  "version": "1.1.0",
+  "documentation": "https://github.com/theslagreen/airpack-home-ha",
+  "issue_tracker": "https://github.com/theslagreen/airpack-home-ha/issues",
+  "requirements": [
+    "pymodbus==3.11.2"
+  ],
+  "dependencies": [
+    "usb"
+  ],
+  "codeowners": [],
+  "iot_class": "local_polling",
+  "config_flow": true,
+  "usb": [
+    {
+      "vid": "10C4",
+      "pid": "EA60",
+      "description": "*CP210*"
+    },
+    {
+      "vid": "1A86",
+      "pid": "7523",
+      "description": "*CH340*"
+    },
+    {
+      "vid": "0403",
+      "pid": "6001",
+      "description": "*FT232*"
+    }
+  ]
+}

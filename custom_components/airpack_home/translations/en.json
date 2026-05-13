@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AirPack Home Setup",
+        "description": "Enter Modbus RTU connection parameters (RS485 → USB)",
+        "data": {
+          "port": "Serial port (e.g. /dev/ttyUSB0)",
+          "slave": "Modbus device address (default: 10)",
+          "baudrate": "Baud rate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the device. Check port, address and baud rate."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AirPack Home Options",
+        "data": {
+          "scan_interval": "Data polling interval (seconds)"
+        }
+      }
+    }
+  }
+}
