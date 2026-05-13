@@ -14,7 +14,7 @@ Integration for **Theslagreen AirPack Home** heat recovery units (all h/v/f Ener
 ## Requirements
 - Home Assistant 2024.1.0+
 - RS485 → USB Adapter (e.g., CH340, FTDI, CP210x)
-- RS485 cable connection to the unit
+
 
 ## Installation via HACS
 1. Open HACS → Integrations → **⋮ → Custom repositories**
@@ -46,7 +46,7 @@ Integracja dla rekuperatorów **Theslagreen AirPack Home** (wszystkie modele h/v
 ## Wymagania
 - Home Assistant 2024.1.0+
 - Adapter RS485 → USB (np. CH340, FTDI, CP210x) podłączony do serwera HA
-- Połączenie z rekuperatorem kablem RS485
+
 
 ## Instalacja przez HACS
 1. Otwórz HACS → Integracje → **⋮ → Repozytoria niestandardowe**
