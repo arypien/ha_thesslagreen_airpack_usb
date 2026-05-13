@@ -47,9 +47,13 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     baudrate=user_input["baudrate"],
                 )
                 if client.connect():
+                    # Verification: we must get a response from the device
                     fw = client.get_firmware_version()
                     model = client.get_device_name()
                     client.close()
+                    if fw is None and (model is None or model == ""):
+                        _LOGGER.error("Connection successful but device did not respond to Modbus queries at port %s", user_input["port"])
+                        return None, None
                     return fw, model
                 client.close()
                 return None, None
@@ -130,9 +134,13 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     baudrate=user_input["baudrate"],
                 )
                 if client.connect():
+                    # Verification: we must get a response from the device
                     fw = client.get_firmware_version()
                     model = client.get_device_name()
                     client.close()
+                    if fw is None and (model is None or model == ""):
+                        _LOGGER.error("Connection successful but device did not respond to Modbus queries at port %s", user_input["port"])
+                        return None, None
                     return fw, model
                 client.close()
                 return None, None
