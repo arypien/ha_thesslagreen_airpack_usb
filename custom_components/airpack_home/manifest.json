@@ -17,17 +17,17 @@
     {
       "vid": "10C4",
       "pid": "EA60",
-      "description": "*CP210*"
+      "description": "*cp210*"
     },
     {
       "vid": "1A86",
       "pid": "7523",
-      "description": "*CH340*"
+      "description": "*ch340*"
     },
     {
       "vid": "0403",
       "pid": "6001",
-      "description": "*FT232*"
+      "description": "*ft232*"
     }
   ]
 }
