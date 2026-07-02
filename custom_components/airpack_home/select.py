@@ -49,7 +49,7 @@ class AirPackBaseSelect(CoordinatorEntity, SelectEntity):
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": model_name,
-            "manufacturer": "Theslagreen",
+            "manufacturer": "Thesslagreen",
             "model": model_name,
             "sw_version": coordinator.data.get("firmware_version") if coordinator.data else None,
         }

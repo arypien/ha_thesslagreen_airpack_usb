@@ -1,6 +1,6 @@
 {
   "domain": "airpack_home",
-  "name": "AirPack Home (Theslagreen)",
+  "name": "AirPack Home (Thesslagreen)",
   "codeowners": ["@arypien"],
   "config_flow": true,
   "dependencies": ["usb"],

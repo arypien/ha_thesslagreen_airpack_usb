@@ -2,7 +2,7 @@
 
 🇵🇱*(Polska wersja dokumentacji znajduje się poniżej)*🇵🇱
 
-Integration for **Theslagreen AirPack Home** heat recovery units (all h/v/f Energy/Energy+ models) via **Modbus RTU** (RS485 → USB).
+Integration for **Thesslagreen AirPack Home** heat recovery units (all h/v/f Energy/Energy+ models) via **Modbus RTU** (RS485 → USB).
 
 ## Key Features
 - **Automatic USB Discovery:** The integration automatically detects your connected RS485 adapter.
@@ -34,7 +34,7 @@ Integration for **Theslagreen AirPack Home** heat recovery units (all h/v/f Ener
 
 # AirPack Home – Integracja Home Assistant 🇵🇱
 
-Integracja dla rekuperatorów **Theslagreen AirPack Home** (wszystkie modele h/v/f Energy/Energy+) przez protokół **Modbus RTU** (RS485 → USB).
+Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/v/f Energy/Energy+) przez protokół **Modbus RTU** (RS485 → USB).
 
 ## Główne cechy
 - **Automatyczne wykrywanie USB:** Integracja sama wykrywa podłączony adapter RS485.
@@ -90,7 +90,7 @@ MIT
 
 This integration was developed with the assistance of **MIX AI**.  
 The AI generated the code based on the official Modbus RTU register documentation  
-provided by Theslagreen. Testing, validation and real-world verification  
+provided by Thesslagreen. Testing, validation and real-world verification  
 was performed by the repository author.
 
 ---
@@ -99,5 +99,5 @@ was performed by the repository author.
 
 Integracja została napisana przy pomocy **MIX AI**.  
 Kod powstał na podstawie oficjalnej dokumentacji rejestrów Modbus RTU  
-dostarczonej przez Theslagreen. Testowanie i weryfikacja na rzeczywistym  
+dostarczonej przez Thesslagreen. Testowanie i weryfikacja na rzeczywistym  
 urządzeniu zostały wykonane przez autora repozytorium.

@@ -30,7 +30,7 @@ class AirPackSyncTimeButton(CoordinatorEntity, ButtonEntity):
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": "AirPack Home",
-            "manufacturer": "Theslagreen",
+            "manufacturer": "Thesslagreen",
             "model": "AirPack Home",
         }
 
