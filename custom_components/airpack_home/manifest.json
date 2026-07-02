@@ -7,7 +7,7 @@
   "documentation": "https://github.com/arypien/ha_thesslagreen_airpack_usb",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/arypien/ha_thesslagreen_airpack_usb/issues",
-  "requirements": ["pymodbus==3.11.2"],
+  "requirements": ["pymodbus==3.13.1"],
   "usb": [
     {
       "vid": "10C4",
@@ -25,5 +25,5 @@
       "description": "*ft232*"
     }
   ],
-  "version": "1.1.4"
+  "version": "1.1.5"
 }
