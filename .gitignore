@@ -1,0 +1,7 @@
+# github folder
+.github/
+
+# Dokumentacja Modbus (lokalnie, nie na GitHub)
+MODBUS_USER_AirPack_Home_*.pdf
+MODBUS_USER_AirPack_Home_*.txt
+doc_f4d112e33720_*.pdf
