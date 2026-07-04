@@ -1,8 +1,6 @@
 # AirPack Home – Home Assistant Integration
 
-<p align="center">
-  <img src="logo.jpg" alt="THESSLAGREEN" width="400">
-</p>
+<
 
 🇵🇱*(Polska wersja dokumentacji znajduje się poniżej)*🇵🇱
 
