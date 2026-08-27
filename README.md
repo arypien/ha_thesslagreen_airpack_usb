@@ -65,29 +65,69 @@ Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/
    - **Baudrate**: domyślnie `9600`
    - **GWC**: wybierz, czy instalacja posiada gruntowy wymiennik ciepła. Encje i odczyty GWC są dodawane tylko po włączeniu tej opcji.
 
-## Encje / Entities
+## Entities / Encje
 
-### GWC / Ground heat exchanger
-If **GWC** is enabled during setup (or later in the integration options), the integration exposes the GWC status, regeneration type and GWC temperature. When disabled, no GWC-specific Modbus registers are read and no GWC entities are created.
+### 🌍 GWC / Ground Heat Exchanger / Gruntowy Wymiennik Ciepła
 
-The integration also exposes the summer and winter automatic schedules as `time` entities: four time slots for each day of the week. An unset schedule entry is reported as unavailable because Home Assistant `time` entities cannot represent the AirPack disabled marker (`0xA200`).
+If GWC is enabled during setup (or later in the integration options), the integration exposes the following GWC entities:
+
+Jeśli GWC zostanie włączony podczas konfiguracji integracji (lub później w jej opcjach), integracja udostępnia następujące encje związane z GWC:
+
+* **GWC status / Status GWC**
+* **Regeneration type / Typ regeneracji**
+* **GWC temperature / Temperatura GWC**
+
+When GWC is disabled, no GWC-specific Modbus registers are read and no GWC entities are created.
+
+Gdy GWC jest wyłączony, integracja nie odczytuje rejestrów Modbus związanych z GWC i nie tworzy żadnych encji GWC.
+
+The integration also exposes the **summer and winter automatic schedules** as Home Assistant time entities: four time slots for each day of the week.
+
+Integracja udostępnia również **automatyczne harmonogramy letnie i zimowe** jako encje typu `time` w Home Assistant: cztery przedziały czasowe dla każdego dnia tygodnia.
+
+An unset schedule entry is reported as **unavailable**, because Home Assistant time entities cannot represent the AirPack disabled marker `0xA200`.
+
+Niewprowadzony przedział czasowy jest oznaczany jako **niedostępny**, ponieważ encje typu `time` w Home Assistant nie mogą reprezentować znacznika wyłączenia AirPack `0xA200`.
 
 ### 🌬️ Fan / Wentylator
-Main entity `fan.airpack_home` / Główna encja:
-- On/Off, Speed 0-100%
-- Preset modes: **Automatyczny (Auto)**, **Manualny (Manual)**, **Boost (Wietrzenie)**.
+
+The main entity / Główna encja:
+
+`fan.airpack_home`
+
+It provides / Udostępnia:
+
+* **On/Off / Włączanie i wyłączanie**
+* **Speed 0–100% / Prędkość 0–100%**
+* **Preset modes / Tryby pracy:**
+
+  * **Auto / Automatyczny**
+  * **Manual / Manualny**
+  * **Boost / Wietrzenie**
 
 ### 🌡️ Temperatures / Temperatury
-- `outside_temperature` (TZ1)
-- `supply_temperature` (TN1)
-- `exhaust_temperature` (TP)
-- `heat_recovery_efficiency` (%)
-- `fpx_temperature` (TZ2)
-- `ambient_temperature` (TO)
+
+The integration exposes the following temperature and efficiency sensors:
+
+Integracja udostępnia następujące sensory temperatury i sprawności:
+
+* `outside_temperature` (TZ1) — **Outside temperature / Temperatura zewnętrzna**
+* `supply_temperature` (TN1) — **Supply air temperature / Temperatura nawiewu**
+* `exhaust_temperature` (TP) — **Exhaust air temperature / Temperatura wywiewu**
+* `heat_recovery_efficiency` (%) — **Heat recovery efficiency / Sprawność odzysku ciepła**
+* `fpx_temperature` (TZ2) — **FPX temperature / Temperatura FPX**
+* `ambient_temperature` (TO) — **Ambient temperature / Temperatura otoczenia**
 
 ### 🚨 Alarms / Alarmy
-All S-type (blocking) and E-type (warning) alarms are monitored as binary sensors with `problem` device class.
-Wszystkie alarmy typu S i E są monitorowane jako sensory binarne.
+
+All **S-type (blocking)** and **E-type (warning)** alarms are monitored as Home Assistant binary sensors.
+
+Wszystkie alarmy typu **S (blokujące)** oraz **E (ostrzegawcze)** są monitorowane jako sensory binarne Home Assistant.
+
+All alarm entities use the **Problem** device class.
+
+Wszystkie encje alarmowe korzystają z klasy urządzenia **Problem**.
+
 
 ## License / Licencja
 MIT
