@@ -5,6 +5,12 @@ DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_PORT = "/dev/ttyUSB0"
 DEFAULT_SLAVE = 10
 DEFAULT_BAUDRATE = 9600
+SUPPORTED_BAUDRATES = [4800, 9600, 14400, 19200, 28800, 38400, 57600, 76800, 115200]
+
+SUMMER_SCHEDULE_START = 0x0010
+WINTER_SCHEDULE_START = 0x002C
+SCHEDULE_DAYS = 7
+SCHEDULE_PERIODS = 4
 
 # ─── Modbus function codes ───────────────────────────────────────────────────
 FC_READ_COILS = 1           # 01 READ COILS
@@ -174,6 +180,8 @@ ALARM_REGISTERS = {
     "E152":{"address": 0x2098, "name": "Temperatura wywiewu za wysoka"},
     "E196":{"address": 0x20C6, "name": "Regulacja instalacji nie wykonana"},
     "E197":{"address": 0x20C7, "name": "Regulacja instalacji przerwana"},
+    "E198":{"address": 0x20C6, "name": "Brak komunikacji z modułem CF2"},
+    "E199":{"address": 0x20C6, "name": "Brak komunikacji z modułem CF"},
     "E200":{"address": 0x20C8, "name": "Zabezpieczenie termiczne nagrzewnicy elektrycznej (ostrzeżenie)"},
     "E201":{"address": 0x20C9, "name": "Zabezpieczenie termiczne nagrzewnicy kanałowej"},
 

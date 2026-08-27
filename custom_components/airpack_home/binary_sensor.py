@@ -48,6 +48,14 @@ async def async_setup_entry(
     for key, name, dc in misc_entities:
         entities.append(AirPackBinarySensor(coordinator, entry, key, name, dc))
 
+    if coordinator.has_gwc:
+        entities.append(
+            AirPackBinarySensor(
+                coordinator, entry, "gwc_regeneration_active",
+                "Regeneracja GWC aktywna", BinarySensorDeviceClass.RUNNING,
+            )
+        )
+
     async_add_entities(entities)
 
 

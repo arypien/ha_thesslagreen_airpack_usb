@@ -9,6 +9,8 @@ import serial.tools.list_ports
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
 
+from .schedule_helpers import decode_hhmm, encode_hhmm
+
 _LOGGER = logging.getLogger(__name__)
 
 NO_READING_VALUE = 0x8000  # sensor not connected / no reading
@@ -190,17 +192,27 @@ class AirPackModbusClient:
 
     # ── temperature group ────────────────────────────────────────────────────
 
-    def get_temperatures(self) -> dict[str, float | None]:
-        regs = self.read_input_bulk(0x0010, 7)
+    def get_temperatures(self, include_gwc: bool = True) -> dict[str, float | None]:
+        """Read temperatures, optionally including the GWC sensor register."""
+        if include_gwc:
+            regs = self.read_input_bulk(0x0010, 7)
+        else:
+            regs = self.read_input_bulk(0x0010, 5)
+            if regs is not None:
+                ambient = self.read_input_bulk(0x0016, 1)
+                if ambient:
+                    regs.append(ambient[0])
         if regs is None:
             return {}
         keys = [
             "outside_temperature", "supply_temperature", "exhaust_temperature",
-            "fpx_temperature", "duct_supply_temperature", "gwc_temperature", "ambient_temperature",
+            "fpx_temperature", "duct_supply_temperature",
         ]
+        if include_gwc:
+            keys.extend(["gwc_temperature", "ambient_temperature"])
+        else:
+            keys.append("ambient_temperature")
         return {k: self._temp_value(v) for k, v in zip(keys, regs)}
-
-    # ── airflow group ────────────────────────────────────────────────────────
 
     def get_airflow(self) -> dict[str, int]:
         regs = self.read_input_bulk(0x010F, 7)
@@ -308,6 +320,40 @@ class AirPackModbusClient:
     def set_gwc_off(self, value: bool) -> bool:
         return self.write_register(0x10A0, 1 if value else 0)
 
+    def get_gwc_settings(self) -> dict[str, int | float | bool | tuple[int, int] | None]:
+        period = self.read_holding_registers(0x10A8, 1)
+        regs = self.read_holding_bulk(0x10AA, 6)
+        if period is None or regs is None:
+            return {}
+        return {
+            "gwc_regen_period": period[0],
+            "gwc_delta_temperature": regs[0] * 0.5,
+            "gwc_start_winter": decode_hhmm(regs[1]),
+            "gwc_stop_winter": decode_hhmm(regs[2]),
+            "gwc_start_summer": decode_hhmm(regs[3]),
+            "gwc_stop_summer": decode_hhmm(regs[4]),
+            "gwc_regeneration_active": bool(regs[5]),
+        }
+
+    def set_gwc_delta_temperature(self, value: float) -> bool:
+        return self.write_register(0x10AA, int(round(value / 0.5)))
+
+    def set_gwc_schedule_time(self, address: int, value: tuple[int, int] | None) -> bool:
+        return self.write_register(address, encode_hhmm(*(value or (None, None))))
+
+    def get_schedule(self, start_address: int) -> list[list[tuple[int, int] | None]] | None:
+        first = self.read_holding_bulk(start_address, 16)
+        second = self.read_holding_bulk(start_address + 16, 12)
+        if first is None or second is None:
+            return None
+        regs = first + second
+        return [[decode_hhmm(regs[day * 4 + period]) for period in range(4)] for day in range(7)]
+
+    def set_schedule_time(self, start_address: int, day: int, period: int, value: tuple[int, int] | None) -> bool:
+        if not 0 <= day < 7 or not 0 <= period < 4:
+            raise ValueError("day and period are outside the AirPack schedule")
+        return self.write_register(start_address + day * 4 + period, encode_hhmm(*(value or (None, None))))
+
     # ── special mode ─────────────────────────────────────────────────────────
 
     def get_special_mode(self) -> int | None:
@@ -327,11 +373,29 @@ class AirPackModbusClient:
         return {"any_warning": regs[0], "any_error": regs[1]}
 
     def get_all_alarms(self, alarm_registers: dict) -> dict[str, bool]:
-        """Read individual alarm registers one at a time (addresses non-contiguous)."""
-        result = {}
-        for key, reg in alarm_registers.items():
-            regs = self.read_holding_registers(reg["address"], 1)
-            result[key] = bool(regs[0]) if regs else False
+        """Read alarm registers in contiguous blocks to reduce RTU requests."""
+        result = {key: False for key in alarm_registers}
+        ordered = sorted(alarm_registers.items(), key=lambda item: item[1]["address"])
+        index = 0
+        while index < len(ordered):
+            start = ordered[index][1]["address"]
+            end = start
+            block = [ordered[index]]
+            index += 1
+            while index < len(ordered):
+                address = ordered[index][1]["address"]
+                if address - end >= 16:
+                    break
+                end = address
+                block.append(ordered[index])
+                index += 1
+
+            regs = self.read_holding_registers(start, end - start + 1)
+            if regs:
+                for key, reg in block:
+                    offset = reg["address"] - start
+                    if offset < len(regs):
+                        result[key] = bool(regs[offset])
         return result
 
     def reset_alarm(self, address: int) -> bool:

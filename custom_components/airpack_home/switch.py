@@ -30,16 +30,19 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: AirPackCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
+    entities = [
         AirPackOnOffSwitch(coordinator, entry),
         AirPackAutoManualSwitch(coordinator, entry),
         AirPackBypassSwitch(coordinator, entry),
         AirPackSpecialSwitch(coordinator, entry, "switch_hood",        "Okap",         SPECIAL_MODE_HOOD),
         AirPackSpecialSwitch(coordinator, entry, "switch_fireplace",   "Kominek",       SPECIAL_MODE_FIREPLACE),
         AirPackSpecialSwitch(coordinator, entry, "switch_airing",      "Wietrzenie",    SPECIAL_MODE_AIRING_MAN),
-        AirPackSpecialSwitch(coordinator, entry, "switch_open_window", "Otwarte okna",  SPECIAL_MODE_OPEN_WINDOW),
+        AirPackSpecialSwitch(coordinator, entry, "switch_open_window", "Otwarte okna", SPECIAL_MODE_OPEN_WINDOW),
         AirPackSpecialSwitch(coordinator, entry, "switch_empty_house", "Pusty dom",     SPECIAL_MODE_EMPTY_HOUSE),
-    ])
+    ]
+    if coordinator.has_gwc:
+        entities.append(AirPackGwcSwitch(coordinator, entry))
+    async_add_entities(entities)
 
 
 def _device_info(coordinator: AirPackCoordinator, entry: ConfigEntry):

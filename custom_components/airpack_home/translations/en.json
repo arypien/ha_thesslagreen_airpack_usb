@@ -7,7 +7,17 @@
         "data": {
           "port": "Serial port (e.g. /dev/ttyUSB0)",
           "slave": "Modbus device address (default: 10)",
-          "baudrate": "Baud rate"
+          "baudrate": "Baud rate",
+          "has_gwc": "The installation has a ground heat exchanger (GWC)"
+        }
+      },
+      "confirm": {
+        "title": "Configure detected AirPack device",
+        "description": "Detected RS485 adapter: {device}",
+        "data": {
+          "slave": "Modbus device address (default: 10)",
+          "baudrate": "Baud rate",
+          "has_gwc": "The installation has a ground heat exchanger (GWC)"
         }
       }
     },
@@ -23,7 +33,8 @@
       "init": {
         "title": "AirPack Home Options",
         "data": {
-          "scan_interval": "Data polling interval (seconds)"
+          "scan_interval": "Data polling interval (seconds)",
+          "has_gwc": "The installation has a ground heat exchanger (GWC)"
         }
       }
     }

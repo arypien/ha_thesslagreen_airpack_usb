@@ -63,8 +63,14 @@ Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/
    - **Port**: Wybierz z listy (zalecane) lub wpisz ręcznie.
    - **Adres Modbus**: domyślnie `10` (patrz etykieta urządzenia)
    - **Baudrate**: domyślnie `9600`
+   - **GWC**: wybierz, czy instalacja posiada gruntowy wymiennik ciepła. Encje i odczyty GWC są dodawane tylko po włączeniu tej opcji.
 
 ## Encje / Entities
+
+### GWC / Ground heat exchanger
+If **GWC** is enabled during setup (or later in the integration options), the integration exposes the GWC status, regeneration type and GWC temperature. When disabled, no GWC-specific Modbus registers are read and no GWC entities are created.
+
+The integration also exposes the summer and winter automatic schedules as `time` entities: four time slots for each day of the week. An unset schedule entry is reported as unavailable because Home Assistant `time` entities cannot represent the AirPack disabled marker (`0xA200`).
 
 ### 🌬️ Fan / Wentylator
 Main entity `fan.airpack_home` / Główna encja:

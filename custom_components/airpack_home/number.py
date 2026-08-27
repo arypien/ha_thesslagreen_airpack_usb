@@ -16,7 +16,7 @@ async def async_setup_entry(
 ) -> None:
     coordinator: AirPackCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([
+    entities = [
         # Fan intensity
         AirPackNumberEntity(coordinator, entry, "air_flow_manual",    "Intensywność wentylacji (manual)",   10, 100, 1,   "%",   0x1072, 1.0,   None),
         AirPackNumberEntity(coordinator, entry, "air_flow_temporary", "Intensywność wentylacji (chwilowy)", 10, 100, 1,   "%",   0x1073, 1.0,   None),
@@ -41,7 +41,15 @@ async def async_setup_entry(
         AirPackNumberEntity(coordinator, entry, "empty_house_coef", "Intensywność PUSTY DOM (%)", 10, 50, 1, "%", 0x1088, 1.0, None),
         # Fireplace
         AirPackNumberEntity(coordinator, entry, "fireplace_supply_coef", "Różnicowanie KOMINEK (%)", 5, 50, 1, "%", 0x1084, 1.0, None),
-    ])
+    ]
+    if coordinator.has_gwc:
+        entities.append(
+            AirPackNumberEntity(coordinator, entry, "gwc_delta_temperature", "Różnica temperatur regeneracji GWC", 0, 10, 0.5, "°C", 0x10AA, 0.5, NumberDeviceClass.TEMPERATURE)
+        )
+        entities.append(
+            AirPackNumberEntity(coordinator, entry, "gwc_regen_period", "Czas regeneracji GWC", 4, 8, 1, "h", 0x10A8, 1.0, None)
+        )
+    async_add_entities(entities)
 
 
 class AirPackNumberEntity(CoordinatorEntity, NumberEntity):

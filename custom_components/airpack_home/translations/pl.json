@@ -7,7 +7,17 @@
         "data": {
           "port": "Port szeregowy (np. /dev/ttyUSB0)",
           "slave": "Adres urządzenia Modbus (domyślnie: 10)",
-          "baudrate": "Szybkość transmisji"
+          "baudrate": "Szybkość transmisji",
+          "has_gwc": "Instalacja posiada gruntowy wymiennik ciepła (GWC)"
+        }
+      },
+      "confirm": {
+        "title": "Konfiguracja wykrytego urządzenia AirPack",
+        "description": "Wykryty adapter RS485: {device}",
+        "data": {
+          "slave": "Adres urządzenia Modbus (domyślnie: 10)",
+          "baudrate": "Szybkość transmisji",
+          "has_gwc": "Instalacja posiada gruntowy wymiennik ciepła (GWC)"
         }
       }
     },
@@ -23,7 +33,8 @@
       "init": {
         "title": "Opcje AirPack Home",
         "data": {
-          "scan_interval": "Interwał odczytu danych (sekundy)"
+          "scan_interval": "Interwał odczytu danych (sekundy)",
+          "has_gwc": "Instalacja posiada gruntowy wymiennik ciepła (GWC)"
         }
       }
     }

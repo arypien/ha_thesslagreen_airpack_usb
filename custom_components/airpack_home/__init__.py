@@ -22,6 +22,7 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.FAN,
     Platform.BUTTON,
+    Platform.TIME,
 ]
 
 

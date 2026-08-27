@@ -24,13 +24,16 @@ async def async_setup_entry(
 ) -> None:
     coordinator: AirPackCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([
+    entities = [
         AirPackModeSelect(coordinator, entry),
         AirPackSeasonSelect(coordinator, entry),
         AirPackSpecialModeSelect(coordinator, entry),
         AirPackComfortModeSelect(coordinator, entry),
         AirPackFilterTypeSelect(coordinator, entry),
-    ])
+    ]
+    if coordinator.has_gwc:
+        entities.append(AirPackGwcRegenSelect(coordinator, entry))
+    async_add_entities(entities)
 
 
 class AirPackBaseSelect(CoordinatorEntity, SelectEntity):

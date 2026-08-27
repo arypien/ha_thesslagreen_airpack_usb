@@ -77,6 +77,12 @@ async def async_setup_entry(
         AirPackTextSensor(coordinator, entry, "device_datetime",      "Czas urządzenia"),
     ]
 
+    if coordinator.has_gwc:
+        entities.extend([
+            AirPackTemperatureSensor(coordinator, entry, "gwc_temperature", "Temperatura GWC (TZ3)"),
+            AirPackMappedSensor(coordinator, entry, "gwc_mode", "Status GWC", GWC_MODE_MAP),
+        ])
+
     async_add_entities(entities)
 
 

@@ -12,7 +12,7 @@ from homeassistant.components import usb
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DEFAULT_BAUDRATE, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DEFAULT_SLAVE, DOMAIN
+from .const import DEFAULT_BAUDRATE, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DEFAULT_SLAVE, DOMAIN, SUPPORTED_BAUDRATES
 from .modbus_client import get_serial_by_id
 
 _LOGGER = logging.getLogger(__name__)
@@ -85,7 +85,8 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("port", default=DEFAULT_PORT): str,
                     vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
-                    vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In([4800, 9600, 19200, 38400, 57600, 115200]),
+                    vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
+                    vol.Required("has_gwc", default=False): bool,
                 }
             )
         else:
@@ -93,7 +94,8 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("port"): vol.In(list_of_ports),
                     vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
-                    vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In([4800, 9600, 19200, 38400, 57600, 115200]),
+                    vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
+                    vol.Required("has_gwc", default=False): bool,
                 }
             )
 
@@ -166,7 +168,8 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="confirm",
             data_schema=vol.Schema({
                 vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
-                vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In([4800, 9600, 19200, 38400, 57600, 115200]),
+                vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
+                vol.Required("has_gwc", default=False): bool,
             }),
             errors=errors,
             description_placeholders={"device": self._discovered_device}
@@ -195,7 +198,11 @@ class AirPackOptionsFlow(config_entries.OptionsFlow):
                     vol.Required(
                         "scan_interval",
                         default=self._config_entry.options.get("scan_interval", DEFAULT_SCAN_INTERVAL),
-                    ): vol.All(int, vol.Range(min=5, max=300))
+                    ): vol.All(int, vol.Range(min=5, max=300)),
+                    vol.Required(
+                        "has_gwc",
+                        default=self._config_entry.options.get("has_gwc", self._config_entry.data.get("has_gwc", False)),
+                    ): bool,
                 }
             ),
         )

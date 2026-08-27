@@ -25,6 +25,7 @@ class AirPackCoordinator(DataUpdateCoordinator):
     """Polls the AirPack unit and caches all data."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self._has_gwc = entry.options.get("has_gwc", entry.data.get("has_gwc", False))
         self._client = AirPackModbusClient(
             port=entry.data["port"],
             slave=entry.data.get("slave", 10),
@@ -59,6 +60,11 @@ class AirPackCoordinator(DataUpdateCoordinator):
     def client(self) -> AirPackModbusClient:
         return self._client
 
+    @property
+    def has_gwc(self) -> bool:
+        """Whether the configured installation has a ground heat exchanger."""
+        return self._has_gwc
+
     async def _async_update_data(self) -> dict:
         """Fetch all data from the device."""
         try:
@@ -80,7 +86,7 @@ class AirPackCoordinator(DataUpdateCoordinator):
             data["firmware_version"] = fw
 
         # 1. Temperatures
-        temps = self._client.get_temperatures()
+        temps = self._client.get_temperatures(include_gwc=self._has_gwc)
         data.update(temps)
         
         # Calculate efficiency: (TN1 - TZ1) / (TP - TZ1) * 100
@@ -137,29 +143,47 @@ class AirPackCoordinator(DataUpdateCoordinator):
         if bypass_user_regs:
             data["bypass_user_mode"] = bypass_user_regs[0]
 
-        # 8. Special mode
+        # 8. GWC (optional hardware)
+        if self._has_gwc:
+            gwc = self._client.get_gwc()
+            if gwc:
+                data.update(gwc)
+            gwc_settings = self._client.get_gwc_settings()
+            if gwc_settings:
+                data.update(gwc_settings)
+
+        from .const import SUMMER_SCHEDULE_START, WINTER_SCHEDULE_START
+        # Automatic schedules are available independently of the optional GWC.
+        summer_schedule = self._client.get_schedule(SUMMER_SCHEDULE_START)
+        winter_schedule = self._client.get_schedule(WINTER_SCHEDULE_START)
+        if summer_schedule is not None:
+            data["summer_schedule"] = summer_schedule
+        if winter_schedule is not None:
+            data["winter_schedule"] = winter_schedule
+
+        # 9. Special mode
         sm = self._client.get_special_mode()
         if sm is not None:
             data["special_mode"] = sm
 
-        # 9. PWM voltages
+        # 10. PWM voltages
         pwms = self._client.get_pwm_voltages()
         data.update(pwms)
 
-        # 10. Nominal flows
+        # 11. Nominal flows
         nominals = self._client.get_nominal_flows()
         data.update(nominals)
 
-        # 11. Global alarm flags
+        # 12. Global alarm flags
         alarm_flags = self._client.get_alarm_flags()
         if alarm_flags:
             data.update(alarm_flags)
 
-        # 12. Individual alarms (non-contiguous — read one by one)
+        # 13. Individual alarms (non-contiguous — read one by one)
         alarms = self._client.get_all_alarms(ALARM_REGISTERS)
         data.update(alarms)
 
-        # 13. Antifreeze
+        # 14. Antifreeze
         af_regs = self._client.read_holding_registers(0x1060, 1)
         if af_regs:
             data["antifreeze_mode"] = af_regs[0]
@@ -167,12 +191,12 @@ class AirPackCoordinator(DataUpdateCoordinator):
         if afs_regs:
             data["antifreeze_stage"] = afs_regs[0]
 
-        # 14. Filter type
+        # 15. Filter type
         ft = self._client.get_filter_type()
         if ft is not None:
             data["filter_change"] = ft
 
-        # 15. Coils (relay outputs)
+        # 16. Coils (relay outputs)
         coil_map = {
             "coil_info": 0x000A,
             "coil_power_supply_fans": 0x000B,
@@ -183,7 +207,7 @@ class AirPackCoordinator(DataUpdateCoordinator):
             if result:
                 data[key] = result[0]
 
-        # 16. Discrete inputs
+        # 17. Discrete inputs
         disc_map = {
             "disc_ppoz": 0x000F,
             "disc_dp_ahu_filter_overflow": 0x0012,
@@ -194,12 +218,12 @@ class AirPackCoordinator(DataUpdateCoordinator):
             if result:
                 data[key] = result[0]
 
-        # 17. Stop alarm code
+        # 18. Stop alarm code
         stop_regs = self._client.read_holding_registers(0x1120, 1)
         if stop_regs:
             data["stop_ahu_code"] = stop_regs[0]
 
-        # 18. Number entity registers - airing times, delays, coefficients
+        # 19. Number entity registers - airing times, delays, coefficients
         number_map = {
             "airing_panel_mode_time":   0x1089,
             "airing_switch_mode_time":  0x108A,
@@ -222,7 +246,7 @@ class AirPackCoordinator(DataUpdateCoordinator):
             if regs:
                 data[key] = regs[0]
 
-        # 19. Device datetime
+        # 20. Device datetime
         dt = self._client.get_datetime()
         if dt:
             data["device_datetime"] = dt["datetime_str"]
