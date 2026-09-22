@@ -32,6 +32,13 @@ Integration for **Thesslagreen AirPack Home** heat recovery units (all h/v/f Ene
    - **Modbus Slave ID**: default is `10` (check unit label)
    - **Baudrate**: default is `9600`
 
+## Wiring / Connection
+<img width="1024" height="935" alt="Gemini_Generated_Image_jawr94jawr94jawr" src="https://github.com/user-attachments/assets/84854d72-5b1c-4d5f-bea5-54d00eb4ae15" />
+<img width="1920" height="1440" alt="reku" src="https://github.com/user-attachments/assets/326e586f-4bf8-4055-b61a-9fba84371fc7" />
+
+### Quick setup
+1. Connect the **A/B** data lines of the RS485 → USB adapter to the corresponding terminals on the unit.
+2. If the adapter is not detected, swap A and B (reversed polarity).
 ---
 
 # AirPack Home – Integracja Home Assistant 🇵🇱
@@ -64,6 +71,15 @@ Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/
    - **Adres Modbus**: domyślnie `10` (patrz etykieta urządzenia)
    - **Baudrate**: domyślnie `9600`
    - **GWC**: wybierz, czy instalacja posiada gruntowy wymiennik ciepła. Encje i odczyty GWC są dodawane tylko po włączeniu tej opcji.
+
+## Podłączenie
+
+<img width="1024" height="932" alt="Gemini_Generated_Image_z8dy80z8dy80z8dy" src="https://github.com/user-attachments/assets/dfe317eb-fd4d-4277-ae13-fb60b3523e48" />
+<img width="1920" height="1440" alt="reku" src="https://github.com/user-attachments/assets/3b0361cc-eba1-4b95-acc8-39a37c3616f5" />
+
+### Szybkie podłączenie
+1. Podłącz linie **A/B** adaptera RS485 → USB do odpowiednich zacisków urządzenia.
+2. Gdy integracja nie wykrywa adaptera — zamień ze sobą A i B (odwrócona polaryzacja).
 
 ## Entities / Encje
 
