@@ -1,13 +1,24 @@
 {
   "domain": "airpack_home",
   "name": "AirPack Home (Thesslagreen)",
-  "codeowners": ["@arypien"],
+  "after_dependencies": [
+    "modbus"
+  ],
+  "codeowners": [
+    "@arypien"
+  ],
   "config_flow": true,
-  "dependencies": ["usb"],
+  "dependencies": [
+    "usb"
+  ],
   "documentation": "https://github.com/arypien/ha_thesslagreen_airpack_usb",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/arypien/ha_thesslagreen_airpack_usb/issues",
-  "requirements": ["pymodbus==3.13.1"],
+  "requirements": [
+    "pymodbus==3.13.1",
+    "modbus-connection[tmodbus]==4.12.1",
+    "tmodbus==0.6.2"
+  ],
   "usb": [
     {
       "vid": "10C4",
@@ -25,5 +36,5 @@
       "description": "*ft232*"
     }
   ],
-  "version": "1.2.0"
+  "version": "1.2.1"
 }

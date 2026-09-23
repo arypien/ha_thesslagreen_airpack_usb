@@ -8,6 +8,7 @@
           "port": "Serial port (e.g. /dev/ttyUSB0)",
           "slave": "Modbus device address (default: 10)",
           "baudrate": "Baud rate",
+          "transport": "Connection type",
           "has_gwc": "The installation has a ground heat exchanger (GWC)"
         }
       },

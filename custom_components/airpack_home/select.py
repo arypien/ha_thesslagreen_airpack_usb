@@ -12,6 +12,8 @@ from .const import (
     DOMAIN,
     FILTER_TYPE_MAP,
     GWC_REGEN_MAP,
+    GROUP_CONTROL_PREFIX,
+    GROUP_SCHEDULE_PREFIX,
     MODE_MAP,
     SEASON_MAP,
     SPECIAL_MODE_MAP,
@@ -43,7 +45,7 @@ class AirPackBaseSelect(CoordinatorEntity, SelectEntity):
         self._key = key
         self._mapping = mapping
         self._reverse = {v: k for k, v in mapping.items()}
-        self._attr_name = name
+        self._attr_name = GROUP_CONTROL_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}_select"
         self._attr_options = list(mapping.values())
         
@@ -86,6 +88,8 @@ class AirPackModeSelect(AirPackBaseSelect):
 class AirPackSeasonSelect(AirPackBaseSelect):
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry, "season_mode", "Harmonogram (Lato/Zima)", SEASON_MAP)
+        # schedule-related -> Harmonogram group, not Sterowanie
+        self._attr_name = GROUP_SCHEDULE_PREFIX + "Harmonogram (Lato/Zima)"
 
     def _write(self, value):
         self.coordinator.client.set_season(value)

@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, GROUP_CONTROL_PREFIX
 from .coordinator import AirPackCoordinator
 
 SPECIAL_MODE_NONE        = 0
@@ -60,7 +60,7 @@ class AirPackBaseSwitch(CoordinatorEntity, SwitchEntity):
     def __init__(self, coordinator, entry, key, name):
         super().__init__(coordinator)
         self._key = key
-        self._attr_name = name
+        self._attr_name = GROUP_CONTROL_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}_switch"
         self._attr_device_class = SwitchDeviceClass.SWITCH
         self._attr_device_info = _device_info(coordinator, entry)
@@ -165,7 +165,7 @@ class AirPackSpecialSwitch(CoordinatorEntity, SwitchEntity):
     def __init__(self, coordinator, entry, key, name, mode_value):
         super().__init__(coordinator)
         self._mode_value = mode_value
-        self._attr_name = name
+        self._attr_name = GROUP_CONTROL_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}_switch"
         self._attr_device_class = SwitchDeviceClass.SWITCH
         self._attr_icon = SPECIAL_ICONS.get(mode_value, "mdi:toggle-switch")

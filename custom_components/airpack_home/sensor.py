@@ -21,6 +21,7 @@ from .const import (
     FILTER_TYPE_MAP,
     GWC_MODE_MAP,
     GWC_REGEN_MAP,
+    GROUP_SENSORS_PREFIX,
     MODE_MAP,
     SEASON_MAP,
     SPECIAL_MODE_MAP,
@@ -92,7 +93,7 @@ class AirPackBaseEntity(CoordinatorEntity):
     def __init__(self, coordinator: AirPackCoordinator, entry: ConfigEntry, key: str, name: str) -> None:
         super().__init__(coordinator)
         self._key = key
-        self._attr_name = name
+        self._attr_name = GROUP_SENSORS_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         
         # Use recognized model name if available

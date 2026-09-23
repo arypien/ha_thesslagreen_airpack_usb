@@ -25,7 +25,7 @@ PRESET_BOOST = "Boost (Wietrzenie)"
 class AirPackFan(CoordinatorEntity, FanEntity):
     """AirPack Fan entity."""
 
-    _attr_name = "AirPack Home"
+    _attr_name = "Sterowanie · Wentylacja"
     _attr_supported_features = (
         FanEntityFeature.SET_SPEED
         | FanEntityFeature.PRESET_MODE

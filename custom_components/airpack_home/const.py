@@ -7,10 +7,26 @@ DEFAULT_SLAVE = 10
 DEFAULT_BAUDRATE = 9600
 SUPPORTED_BAUDRATES = [4800, 9600, 14400, 19200, 28800, 38400, 57600, 76800, 115200]
 
+# Entity name grouping prefixes — kept as empty by default (no grouping),
+# matching the original flat entity names. Set a non-empty value to prefix
+# groups in lists, pickers and dashboards.
+GROUP_SENSORS_PREFIX = ""
+GROUP_CONTROL_PREFIX = ""
+GROUP_SCHEDULE_PREFIX = ""
+
 SUMMER_SCHEDULE_START = 0x0010
 WINTER_SCHEDULE_START = 0x002C
+SUMMER_SETTINGS_START = 0x0048   # [AATT] intensity + supply-temp setpoint per segment
+WINTER_SETTINGS_START = 0x0064
 SCHEDULE_DAYS = 7
 SCHEDULE_PERIODS = 4
+
+# Airing (Wietrzenie) start hour — one BCD [HHMM] register per season/day,
+# independent of the schedule segments. 0x2400 (24:00) = disabled.
+AIRING_SUMMER_START = 0x0080
+AIRING_WINTER_START = 0x009C
+AIRING_DAY_STRIDE = 0x0004
+AIRING_DAYS = 7
 
 # ─── Modbus function codes ───────────────────────────────────────────────────
 FC_READ_COILS = 1           # 01 READ COILS
