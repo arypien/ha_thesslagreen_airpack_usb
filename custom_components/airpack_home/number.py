@@ -7,8 +7,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import (
+    SUMMER_SETTINGS_START,
+    WINTER_SETTINGS_START,
+    SCHEDULE_DAYS,
+    SCHEDULE_PERIODS,
+    GROUP_CONTROL_PREFIX,
+    GROUP_SCHEDULE_PREFIX,
+    DOMAIN,
+)
 from .coordinator import AirPackCoordinator
+
+DAY_NAMES = ("Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela")
 
 
 async def async_setup_entry(
@@ -42,6 +52,27 @@ async def async_setup_entry(
         # Fireplace
         AirPackNumberEntity(coordinator, entry, "fireplace_supply_coef", "Różnicowanie KOMINEK (%)", 5, 50, 1, "%", 0x1084, 1.0, None),
     ]
+
+    # Per-segment automatic schedule settings ([AATT]: intensity % and supply-temp °C)
+    for season, start, season_name in (
+        ("summer", SUMMER_SETTINGS_START, "LATO"),
+        ("winter", WINTER_SETTINGS_START, "ZIMA"),
+    ):
+        for day in range(SCHEDULE_DAYS):
+            for period in range(SCHEDULE_PERIODS):
+                entities.append(
+                    AirPackScheduleSettingNumber(
+                        coordinator, entry, season, day, period,
+                        f"{season_name} {DAY_NAMES[day]} odc. {period + 1} — intensywność",
+                        "intensity", start, 10, 100, 1, "%", None)
+                )
+                entities.append(
+                    AirPackScheduleSettingNumber(
+                        coordinator, entry, season, day, period,
+                        f"{season_name} {DAY_NAMES[day]} odc. {period + 1} — temp. nawiewu",
+                        "temperature", start, 10, 45, 0.5, "°C", NumberDeviceClass.TEMPERATURE)
+                )
+
     if coordinator.has_gwc:
         entities.append(
             AirPackNumberEntity(coordinator, entry, "gwc_delta_temperature", "Różnica temperatur regeneracji GWC", 0, 10, 0.5, "°C", 0x10AA, 0.5, NumberDeviceClass.TEMPERATURE)
@@ -71,7 +102,7 @@ class AirPackNumberEntity(CoordinatorEntity, NumberEntity):
         self._key = key
         self._register = register
         self._scale = scale
-        self._attr_name = name
+        self._attr_name = GROUP_CONTROL_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}_number"
         self._attr_native_min_value = min_val
         self._attr_native_max_value = max_val
@@ -104,6 +135,82 @@ class AirPackNumberEntity(CoordinatorEntity, NumberEntity):
 
         def write():
             self.coordinator.client.write_register(self._register, raw)
+
+        await self.hass.async_add_executor_job(write)
+        await self.coordinator.async_request_refresh()
+
+
+class AirPackScheduleSettingNumber(CoordinatorEntity, NumberEntity):
+    """Per-segment automatic schedule setting ([AATT]): intensity % or supply-temp °C."""
+
+    def __init__(
+        self,
+        coordinator: AirPackCoordinator,
+        entry: ConfigEntry,
+        season: str,
+        day: int,
+        period: int,
+        name: str,
+        field: str,
+        settings_start: int,
+        min_val: float,
+        max_val: float,
+        step: float,
+        unit: str,
+        device_class,
+    ) -> None:
+        super().__init__(coordinator)
+        self._season = season
+        self._day = day
+        self._period = period
+        self._field = field
+        self._settings_start = settings_start
+        self._attr_name = GROUP_SCHEDULE_PREFIX + name
+        self._attr_unique_id = f"{entry.entry_id}_{season}_schedule_{day}_{period}_{field}_number"
+        self._attr_native_min_value = min_val
+        self._attr_native_max_value = max_val
+        self._attr_native_step = step
+        self._attr_native_unit_of_measurement = unit
+        self._attr_device_class = device_class
+        self._attr_mode = NumberMode.SLIDER
+
+        model_name = coordinator.data.get("device_model", "AirPack Home") if coordinator.data else "AirPack Home"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": model_name,
+            "manufacturer": "Thesslagreen",
+            "model": model_name,
+            "sw_version": coordinator.data.get("firmware_version") if coordinator.data else None,
+        }
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        settings = self.coordinator.data.get(f"{self._season}_settings")
+        if not settings:
+            return None
+        seg = settings[self._day][self._period]
+        if seg is None:
+            return None
+        intensity, temperature = seg
+        return intensity if self._field == "intensity" else temperature
+
+    async def async_set_native_value(self, value: float) -> None:
+        settings = self.coordinator.data.get(f"{self._season}_settings") if self.coordinator.data else None
+        current = settings[self._day][self._period] if settings else None
+
+        def write():
+            if self._field == "intensity":
+                temp = current[1] if current else None
+                self.coordinator.client.set_schedule_setting(
+                    self._settings_start, self._day, self._period, int(value), temp
+                )
+            else:
+                intensity = current[0] if current else None
+                self.coordinator.client.set_schedule_setting(
+                    self._settings_start, self._day, self._period, intensity, float(value)
+                )
 
         await self.hass.async_add_executor_job(write)
         await self.coordinator.async_request_refresh()

@@ -1,6 +1,7 @@
 """Modbus RTU client for AirPack Home."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -9,11 +10,101 @@ import serial.tools.list_ports
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
 
-from .schedule_helpers import decode_hhmm, encode_hhmm
+from .schedule_helpers import decode_aatt, decode_hhmm, encode_aatt, encode_hhmm
+from .const import SCHEDULE_DAYS, SCHEDULE_PERIODS
 
 _LOGGER = logging.getLogger(__name__)
 
 NO_READING_VALUE = 0x8000  # sensor not connected / no reading
+
+
+def _crc16(data: bytes) -> int:
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+    return crc
+
+
+class _RtuResponse:
+    def __init__(self, registers=None, bits=None, error=False):
+        self.registers = registers or []
+        self.bits = bits or []
+        self._error = error
+
+    def isError(self):
+        return self._error
+
+
+class _SerialxModbusClient:
+    """Synchronous facade over serialx, executed on HA's event loop."""
+    def __init__(self, port: str, slave: int, baudrate: int, loop) -> None:
+        self.port, self.slave, self.baudrate, self.loop = port, slave, baudrate, loop
+        self.reader = self.writer = None
+
+    def connect(self) -> bool:
+        import serialx
+        try:
+            self.reader, self.writer = self._run(serialx.open_serial_connection(
+                self.port, baudrate=self.baudrate))
+            return True
+        except Exception as exc:
+            _LOGGER.error("serialx connect failed for %s: %s", self.port, exc)
+            return False
+
+    def close(self) -> None:
+        if self.writer is not None:
+            try:
+                self._run(self._close_writer())
+            except Exception:
+                pass
+        self.reader = self.writer = None
+
+    async def _close_writer(self):
+        self.writer.close()
+        await self.writer.wait_closed()
+
+    def _run(self, awaitable):
+        return asyncio.run_coroutine_threadsafe(awaitable, self.loop).result(timeout=20)
+
+    async def _exchange(self, frame: bytes) -> bytes:
+        self.writer.write(frame)
+        await self.writer.drain()
+        return await asyncio.wait_for(self.reader.read(256), timeout=10)
+
+    def _request(self, function: int, address: int, count: int, values=None):
+        if self.reader is None or self.writer is None:
+            if not self.connect():
+                return _RtuResponse(error=True)
+        if values is None:
+            payload = bytes((self.slave, function, address >> 8, address & 255,
+                             count >> 8, count & 255))
+        else:
+            payload = bytes((self.slave, function, address >> 8, address & 255,
+                             len(values) >> 8, len(values) & 255)) + b"".join(v.to_bytes(2, "big") for v in values)
+        crc = _crc16(payload)
+        frame = payload + bytes((crc & 255, crc >> 8))
+        raw = self._run(self._exchange(frame))
+        if len(raw) < 5 or raw[0] != self.slave or raw[1] != function:
+            return _RtuResponse(error=True)
+        if raw[1] & 0x80:
+            return _RtuResponse(error=True)
+        crc_expected = _crc16(raw[:-2])
+        if raw[-2] | (raw[-1] << 8) != crc_expected:
+            return _RtuResponse(error=True)
+        if function in (1, 2):
+            return _RtuResponse(bits=[bool(raw[3 + i // 8] & (1 << (i % 8))) for i in range(count)])
+        if function in (3, 4):
+            return _RtuResponse(registers=[int.from_bytes(raw[3+i:5+i], "big") for i in range(0, raw[2], 2)])
+        return _RtuResponse()
+
+    def read_coils(self, address, count=1, device_id=None): return self._request(1, address, count)
+    def read_discrete_inputs(self, address, count=1, device_id=None): return self._request(2, address, count)
+    def read_holding_registers(self, address, count=1, device_id=None): return self._request(3, address, count)
+    def read_input_registers(self, address, count=1, device_id=None): return self._request(4, address, count)
+    def write_register(self, address, value, device_id=None): return self._request(6, address, 1, [value])
+    def write_registers(self, address, values, device_id=None): return self._request(16, address, len(values), values)
 
 
 def get_serial_by_id(dev_path: str) -> str:
@@ -40,7 +131,7 @@ def get_serial_by_id(dev_path: str) -> str:
 class AirPackModbusClient:
     """Thin wrapper around pymodbus serial client."""
 
-    def __init__(self, port: str, slave: int, baudrate: int = 9600) -> None:
+    def __init__(self, port: str, slave: int, baudrate: int = 9600, hass=None) -> None:
         self._port = get_serial_by_id(port)
         self._slave = slave
         self._client = ModbusSerialClient(
@@ -117,19 +208,24 @@ class AirPackModbusClient:
     def write_register(self, address: int, value: int) -> bool:
         try:
             result = self._client.write_register(address, value, device_id=self._slave)
-            return not result.isError()
         except ModbusException as exc:
             _LOGGER.error("Register write error @ 0x%04X: %s", address, exc)
             return False
+        # pymodbus returns a response object, not a plain bool.
+        if isinstance(result, bool):
+            return result
+        return not result.isError()
 
     def write_registers(self, address: int, values: list[int]) -> bool:
         """Write multiple registers in one operation."""
         try:
             result = self._client.write_registers(address, values, device_id=self._slave)
-            return not result.isError()
         except ModbusException as exc:
             _LOGGER.error("Registers write error @ 0x%04X: %s", address, exc)
             return False
+        if isinstance(result, bool):
+            return result
+        return not result.isError()
 
     # ── temporary mode activation (PDF page 14) ──────────────────────────────
 
@@ -354,6 +450,62 @@ class AirPackModbusClient:
             raise ValueError("day and period are outside the AirPack schedule")
         return self.write_register(start_address + day * 4 + period, encode_hhmm(*(value or (None, None))))
 
+    def get_schedule_settings(self, start_address: int) -> list[list[tuple[int, float] | None]] | None:
+        """Read per-segment [AATT] settings (intensity %, supply temp °C) for 7 days × 4 periods.
+
+        AirPack caps a single read at 16 registers, so days 0-3 and 4-6 are fetched
+        in two bulk reads (mirrors get_schedule).
+        """
+        first = self.read_holding_bulk(start_address, 16)
+        second = self.read_holding_bulk(start_address + 16, SCHEDULE_DAYS * SCHEDULE_PERIODS - 16)
+        if first is None or second is None:
+            return None
+        regs = first + second
+        return [[decode_aatt(regs[day * SCHEDULE_PERIODS + period]) for period in range(SCHEDULE_PERIODS)] for day in range(SCHEDULE_DAYS)]
+
+    def set_schedule_setting(
+        self, start_address: int, day: int, period: int, intensity: int | None, temperature_c: float | None
+    ) -> bool:
+        if not 0 <= day < 7 or not 0 <= period < 4:
+            raise ValueError("day and period are outside the AirPack schedule")
+        value = encode_aatt(intensity, temperature_c) if intensity is not None else 0
+        return self.write_register(start_address + day * SCHEDULE_PERIODS + period, value)
+
+    # ── Airing (Wietrzenie) start hour ────────────────────────────────────────
+    # One BCD [HHMM] register per season/day (disabled = 0x2400), independent of
+    # the schedule segments. Each season occupies a contiguous 25-register span
+    # (day d -> base + d*4), so it is fetched in two sub-16 bulk reads.
+
+    def _read_airing_block(self, base: int) -> list[int] | None:
+        first = self.read_holding_bulk(base, 16)
+        if first is None:
+            return None
+        rest = self.read_holding_bulk(base + 16, 9)
+        if rest is None:
+            return None
+        return first + rest
+
+    def get_airing_start_times(self) -> dict[str, list]:
+        """Return {'airing_start_<season>': [(h, m) | None, ...x7]}."""
+        from .const import (AIRING_SUMMER_START, AIRING_WINTER_START, AIRING_DAYS)
+        from .schedule_helpers import decode_airing_hhmm
+
+        out: dict[str, list] = {}
+        for season, base in (("summer", AIRING_SUMMER_START), ("winter", AIRING_WINTER_START)):
+            block = self._read_airing_block(base)
+            if block and len(block) >= (AIRING_DAYS - 1) * 4 + 1:
+                out[f"airing_start_{season}"] = [decode_airing_hhmm(block[day * 4]) for day in range(AIRING_DAYS)]
+        return out
+
+    def set_airing_start_time(self, season: str, day: int, value: tuple[int, int]) -> bool:
+        if not 0 <= day < 7:
+            raise ValueError("day outside 0..6")
+        from .const import AIRING_SUMMER_START, AIRING_WINTER_START
+        from .schedule_helpers import encode_airing_hhmm
+
+        base = AIRING_SUMMER_START if season == "summer" else AIRING_WINTER_START
+        return self.write_register(base + day * 4, encode_airing_hhmm(*(value or (None, None))))
+
     # ── special mode ─────────────────────────────────────────────────────────
 
     def get_special_mode(self) -> int | None:
@@ -373,7 +525,14 @@ class AirPackModbusClient:
         return {"any_warning": regs[0], "any_error": regs[1]}
 
     def get_all_alarms(self, alarm_registers: dict) -> dict[str, bool]:
-        """Read alarm registers in contiguous blocks to reduce RTU requests."""
+        """Read alarm registers, merging only TRULY consecutive registers into single RTU requests.
+
+        The AirPack S-error register map is SPARSE (0x2002..0x2020 has holes where S3/S4/S5,
+        S11/S12, S18, S21, S27/S28 don't exist). Requesting one contiguous block across a hole
+        makes the unit answer with Modbus Exception 0x04 (Server Device Failure) and the whole
+        read fails. Merging ONLY gap-free runs keeps E-type blocks batched (they are contiguous)
+        while every isolated S register is read individually.
+        """
         result = {key: False for key in alarm_registers}
         ordered = sorted(alarm_registers.items(), key=lambda item: item[1]["address"])
         index = 0
@@ -384,7 +543,7 @@ class AirPackModbusClient:
             index += 1
             while index < len(ordered):
                 address = ordered[index][1]["address"]
-                if address - end >= 16:
+                if address != end + 1:  # only merge strictly consecutive registers
                     break
                 end = address
                 block.append(ordered[index])
@@ -464,8 +623,8 @@ class AirPackModbusClient:
         reg2 = (hh << 8) | mn
         reg3 = (ss << 8) | 0
         try:
-            result = self._client.write_registers(0x0000, [reg0, reg1, reg2, reg3], device_id=self._slave)
-            return not result.isError()
+            # write via the bool-safe wrapper
+            return self.write_registers(0x0000, [reg0, reg1, reg2, reg3])
         except Exception as exc:
             _LOGGER.error("DateTime write error: %s", exc)
             return False

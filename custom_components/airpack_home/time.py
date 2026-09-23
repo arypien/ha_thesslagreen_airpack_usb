@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.time import TimeEntity
 
-from .const import DOMAIN, SUMMER_SCHEDULE_START, WINTER_SCHEDULE_START
+from .const import DOMAIN, GROUP_SCHEDULE_PREFIX, SUMMER_SCHEDULE_START, WINTER_SCHEDULE_START
 from .coordinator import AirPackCoordinator
 DAY_NAMES = ("Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela")
 
@@ -31,6 +31,10 @@ async def async_setup_entry(
         for day in range(7):
             for period in range(4):
                 entities.append(AirPackScheduleTime(coordinator, entry, season, day, period, start))
+    # Airing (Wietrzenie) start hour — one BCD [HHMM] register per season/day.
+    for season in ("summer", "winter"):
+        for day in range(7):
+            entities.append(AirPackAiringTime(coordinator, entry, season, day))
     async_add_entities(entities)
 
 
@@ -38,7 +42,7 @@ class AirPackTimeBase(CoordinatorEntity, TimeEntity):
     def __init__(self, coordinator, entry, key, name):
         super().__init__(coordinator)
         self._key = key
-        self._attr_name = name
+        self._attr_name = GROUP_SCHEDULE_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}_time"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
@@ -91,6 +95,37 @@ class AirPackScheduleTime(AirPackTimeBase):
             self._start_address,
             self._day,
             self._period,
+            (value.hour, value.minute),
+        )
+        await self.coordinator.async_request_refresh()
+
+
+class AirPackAiringTime(AirPackTimeBase):
+    """Daily airing (Wietrzenie) start hour — one BCD [HHMM] register per season/day.
+
+    The register is independent of the schedule segments; 0x2400 (24:00) means
+    the airing start for that day/season is disabled (shown as no value).
+    """
+
+    _SEASON_LABEL = {"summer": "Lato", "winter": "Zima"}
+
+    def __init__(self, coordinator, entry, season, day):
+        label = self._SEASON_LABEL[season]
+        super().__init__(coordinator, entry, f"airing_{season}_{day}", f"{label} · {DAY_NAMES[day]} — początek WIETRZENIA")
+        self._season = season
+        self._day = day
+
+    def _value(self):
+        airing = self.coordinator.data.get(f"airing_start_{self._season}") if self.coordinator.data else None
+        if not airing or self._day >= len(airing):
+            return None
+        return airing[self._day]
+
+    async def async_set_value(self, value: time) -> None:
+        await self.hass.async_add_executor_job(
+            self.coordinator.client.set_airing_start_time,
+            self._season,
+            self._day,
             (value.hour, value.minute),
         )
         await self.coordinator.async_request_refresh()

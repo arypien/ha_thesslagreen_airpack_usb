@@ -30,6 +30,7 @@ class AirPackCoordinator(DataUpdateCoordinator):
             port=entry.data["port"],
             slave=entry.data.get("slave", 10),
             baudrate=entry.data.get("baudrate", 9600),
+            hass=hass,
         )
         self._client.connect()
 
@@ -152,7 +153,7 @@ class AirPackCoordinator(DataUpdateCoordinator):
             if gwc_settings:
                 data.update(gwc_settings)
 
-        from .const import SUMMER_SCHEDULE_START, WINTER_SCHEDULE_START
+        from .const import SUMMER_SCHEDULE_START, WINTER_SCHEDULE_START, SUMMER_SETTINGS_START, WINTER_SETTINGS_START
         # Automatic schedules are available independently of the optional GWC.
         summer_schedule = self._client.get_schedule(SUMMER_SCHEDULE_START)
         winter_schedule = self._client.get_schedule(WINTER_SCHEDULE_START)
@@ -160,6 +161,18 @@ class AirPackCoordinator(DataUpdateCoordinator):
             data["summer_schedule"] = summer_schedule
         if winter_schedule is not None:
             data["winter_schedule"] = winter_schedule
+        # Per-segment [AATT] settings (intensity %, supply-temp setpoint °C)
+        summer_settings = self._client.get_schedule_settings(SUMMER_SETTINGS_START)
+        winter_settings = self._client.get_schedule_settings(WINTER_SETTINGS_START)
+        if summer_settings is not None:
+            data["summer_settings"] = summer_settings
+        if winter_settings is not None:
+            data["winter_settings"] = winter_settings
+        # Airing (Wietrzenie) start hours — one BCD [HHMM] register per season/day,
+        # independent of the schedule segments (disabled = 0x2400).
+        airing_starts = self._client.get_airing_start_times()
+        if airing_starts:
+            data.update(airing_starts)
 
         # 9. Special mode
         sm = self._client.get_special_mode()

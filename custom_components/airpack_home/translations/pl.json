@@ -8,6 +8,7 @@
           "port": "Port szeregowy (np. /dev/ttyUSB0)",
           "slave": "Adres urządzenia Modbus (domyślnie: 10)",
           "baudrate": "Szybkość transmisji",
+          "transport": "Typ połączenia",
           "has_gwc": "Instalacja posiada gruntowy wymiennik ciepła (GWC)"
         }
       },

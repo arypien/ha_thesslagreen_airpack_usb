@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ALARM_REGISTERS, DOMAIN
+from .const import ALARM_REGISTERS, DOMAIN, GROUP_SENSORS_PREFIX
 from .coordinator import AirPackCoordinator
 
 
@@ -63,7 +63,7 @@ class AirPackBinarySensor(CoordinatorEntity, BinarySensorEntity):
     def __init__(self, coordinator: AirPackCoordinator, entry: ConfigEntry, key: str, name: str, device_class=None) -> None:
         super().__init__(coordinator)
         self._key = key
-        self._attr_name = name
+        self._attr_name = GROUP_SENSORS_PREFIX + name
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_device_class = device_class
         

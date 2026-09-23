@@ -32,57 +32,86 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Resolve stable path if possible
-            user_input["port"] = await self.hass.async_add_executor_job(
-                get_serial_by_id, user_input["port"]
-            )
-            
-            # Try to connect
-            from .modbus_client import AirPackModbusClient
-
-            def try_connect():
-                client = AirPackModbusClient(
-                    port=user_input["port"],
-                    slave=user_input["slave"],
-                    baudrate=user_input["baudrate"],
-                )
-                if client.connect():
-                    # Verification: we must get a response from the device
-                    fw = client.get_firmware_version()
-                    model = client.get_device_name()
-                    client.close()
-                    if fw is None and (model is None or model == ""):
-                        _LOGGER.error("Connection successful but device did not respond to Modbus queries at port %s", user_input["port"])
-                        return None, None
-                    return fw, model
-                client.close()
-                return None, None
-
-            fw, model = await self.hass.async_add_executor_job(try_connect)
-            if fw is None:
+            transport = user_input.get("transport", "serial")
+            try:
+                port = user_input["port"]
+            except KeyError:
+                port = None
+            if not port:
                 errors["base"] = "cannot_connect"
             else:
-                # Use model name in title if possible
-                title = f"AirPack {model}" if model else f"AirPack Home ({user_input['port']})"
-                
-                # Unique ID: use port and slave to allow multiple devices
-                # but use the stable port path
-                await self.async_set_unique_id(f"{user_input['port']}_{user_input['slave']}")
-                self._abort_if_unique_id_configured()
-                
-                return self.async_create_entry(
-                    title=title,
-                    data=user_input,
-                )
+                # Resolve stable path
+                if transport == "serial":
+                    port = await self.hass.async_add_executor_job(
+                        get_serial_by_id, port
+                    )
 
-        # List available serial ports
-        ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
-        list_of_ports = {port.device: f"{port.device} ({port.description})" for port in ports}
-        
+                # Try to connect
+                from .modbus_client import AirPackModbusClient
+
+                def try_connect():
+                    try:
+                        client = AirPackModbusClient(
+                            port=port,
+                            slave=user_input["slave"],
+                            baudrate=user_input.get("baudrate", DEFAULT_BAUDRATE),
+                            hass=self.hass,
+                        )
+                        ok = client.connect()
+                        if ok:
+                            fw = client.get_firmware_version()
+                            model = client.get_device_name()
+                            client.close()
+                            if fw is None and (model is None or model == ""):
+                                _LOGGER.error("Connection successful but device did not respond to Modbus queries at port %s", port)
+                                return None, None
+                            return fw, model
+                        client.close()
+                        return None, None
+                    except Exception as exc:  # noqa: BLE001 - surface connection setup failure
+                        _LOGGER.exception("AirPack connection probe failed at %s", port)
+                        return None, None
+
+                fw, model = await self.hass.async_add_executor_job(try_connect)
+                if fw is None:
+                    errors["base"] = "cannot_connect"
+                else:
+                    # Use model name in title if possible
+                    title = f"AirPack {model}" if model else f"AirPack Home ({port})"
+
+                    # Unique ID: stable per port + slave
+                    await self.async_set_unique_id(f"{port}_{user_input['slave']}")
+                    self._abort_if_unique_id_configured()
+
+                    return self.async_create_entry(
+                        title=title,
+                        data={
+                            "transport": transport,
+                            "port": port,
+                            "slave": user_input["slave"],
+                            "baudrate": user_input.get("baudrate", DEFAULT_BAUDRATE),
+                            "has_gwc": user_input.get("has_gwc", False),
+                        },
+                    )
+
+        # transport defaults to serial.
+        transport = (user_input or {}).get("transport", "serial")
+        list_of_ports = {}
+
+        # Local /dev/tty* ports
+        try:
+            ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
+            for port in ports:
+                list_of_ports[port.device] = f"{port.device} ({port.description})"
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Unable to list local serial ports: %s", exc)
+
+
         if not list_of_ports:
-            # Fallback to manual entry if no ports found
+            # Fallback to manual entry
             data_schema = vol.Schema(
                 {
+                    vol.Required("transport"): vol.In(["serial"]),
                     vol.Required("port", default=DEFAULT_PORT): str,
                     vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
                     vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
@@ -92,6 +121,7 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         else:
             data_schema = vol.Schema(
                 {
+                    vol.Required("transport"): vol.In(["serial"]),
                     vol.Required("port"): vol.In(list_of_ports),
                     vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
                     vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
