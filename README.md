@@ -40,12 +40,18 @@ For the weekly ventilation schedule, install the companion
 
 It provides a per-day, per-episode editor for:
 
-- start time,
-- ventilation intensity (0–100%),
-- supply temperature,
-- ventilation start time.
+ - start time,
+ - ventilation intensity (0–100%),
+ - supply temperature,
+ - ventilation start time.
+ 
+It also provides:
 
-Plus a **Winter/Summer** switch, a **reset to defaults** button, and a **PL/EN** localised UI — all backed by the integration's `time.*`, `number.*` and `select.*` entities. The card auto-discovers entities by device prefix, so no manual configuration is needed.
+ - a Winter / Summer switch,
+ - a Restore defaults button,
+ - a PL/EN localised interface.
+
+The card uses the integration's time.*, number.*, and select.* entities and automatically discovers them based on the device prefix, so no manual configuration is required.
 
 **Full documentation & screenshots:**  
 👉 [github.com/arypien/airpack-schedule-card](https://github.com/arypien/airpack-schedule-card)
@@ -93,18 +99,24 @@ Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/
   
 ## Karta harmonogramu
 
-Do tygodniowego harmonogramu wentylacji zainstaluj towarzyszącą
+Do tygodniowego harmonogramu wentylacji zainstaluj dodatkową kartę
 **[kartę AirPack – Ventilation Schedule](https://github.com/arypien/airpack-schedule-card)**
 (HACS, kategoria: **Lovelace**).
 
-Zapewnia edytor per dzień / per odcinek dla:
+Karta zapewnia edycję harmonogramu dla każdego dnia i każdego przedziału czasowego, w tym:
 
 - godziny startu,
 - intensywności wentylacji (0–100%),
 - temperatury nawiewu,
 - początku wietrzenia.
 
-Dodatkowo przełącznik **Zima / Lato**, przycisk **przywracania domyślnych** oraz interfejs w **PL/EN** — wszystko oparte na encjach `time.*`, `number.*` i `select.*` tej integracji. Karta sama wykrywa encje po prefiksie urządzenia, więc nie wymaga ręcznej konfiguracji.
+Dodatkowo dostępne są:
+
+ - przełącznik Zima / Lato,
+ - przycisk Przywróć domyślne,
+ - interfejs w języku polskim i angielskim.
+
+Wszystko działa w oparciu o encje time.*, number.* i select.* udostępniane przez tę integrację. Karta automatycznie wykrywa encje na podstawie prefiksu urządzenia, dzięki czemu nie wymaga ręcznej konfiguracji.
 
 **Pełna dokumentacja i zrzuty ekranu:**  
 👉 [github.com/arypien/airpack-schedule-card](https://github.com/arypien/airpack-schedule-card)
