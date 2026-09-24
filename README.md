@@ -90,6 +90,24 @@ Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/
    - **Adres Modbus**: domyślnie `10` (patrz etykieta urządzenia)
    - **Baudrate**: domyślnie `9600`
    - **GWC**: wybierz, czy instalacja posiada gruntowy wymiennik ciepła. Encje i odczyty GWC są dodawane tylko po włączeniu tej opcji.
+  
+## Karta harmonogramu
+
+Do tygodniowego harmonogramu wentylacji zainstaluj towarzyszącą
+**[kartę AirPack – Ventilation Schedule](https://github.com/arypien/airpack-schedule-card)**
+(HACS, kategoria: **Lovelace**).
+
+Zapewnia edytor per dzień / per odcinek dla:
+
+- godziny startu,
+- intensywności wentylacji (0–100%),
+- temperatury nawiewu,
+- początku wietrzenia.
+
+Dodatkowo przełącznik **Zima / Lato**, przycisk **przywracania domyślnych** oraz interfejs w **PL/EN** — wszystko oparte na encjach `time.*`, `number.*` i `select.*` tej integracji. Karta sama wykrywa encje po prefiksie urządzenia, więc nie wymaga ręcznej konfiguracji.
+
+**Pełna dokumentacja i zrzuty ekranu:**  
+👉 [github.com/arypien/airpack-schedule-card](https://github.com/arypien/airpack-schedule-card)
 
 ## Podłączenie
 
