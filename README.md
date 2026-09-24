@@ -31,6 +31,25 @@ Integration for **Thesslagreen AirPack Home** heat recovery units (all h/v/f Ene
    - **Port**: Select from the list (recommended) or enter manually.
    - **Modbus Slave ID**: default is `10` (check unit label)
    - **Baudrate**: default is `9600`
+     
+## Schedule card
+
+For the weekly ventilation schedule, install the companion
+**[AirPack – Ventilation Schedule Card](https://github.com/arypien/airpack-schedule-card)**
+(HACS, category: **Lovelace**).
+
+It provides a per-day, per-episode editor for:
+
+- start time,
+- ventilation intensity (0–100%),
+- supply temperature,
+- ventilation start time.
+
+Plus a **Winter/Summer** switch, a **reset to defaults** button, and a **PL/EN** localised UI — all backed by the integration's `time.*`, `number.*` and `select.*` entities. The card auto-discovers entities by device prefix, so no manual configuration is needed.
+
+**Full documentation & screenshots:**  
+👉 [github.com/arypien/airpack-schedule-card](https://github.com/arypien/airpack-schedule-card)
+
 
 ## Wiring / Connection
 <img width="1024" height="935" alt="Gemini_Generated_Image_jawr94jawr94jawr" src="https://github.com/user-attachments/assets/84854d72-5b1c-4d5f-bea5-54d00eb4ae15" />
