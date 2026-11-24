@@ -208,7 +208,7 @@ was performed by the repository author.
 
 ---
 
-## Podziękowania 🇵🇱
+## Podziękowania 🇵🇱 ##
 
 Integracja została napisana przy pomocy **MIX AI**.  
 Kod powstał na podstawie oficjalnej dokumentacji rejestrów Modbus RTU  
