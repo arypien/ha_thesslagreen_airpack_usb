@@ -3,12 +3,29 @@
     "step": {
       "user": {
         "title": "Konfiguracja AirPack Home",
+        "description": "Wybierz sposób połączenia z rekuperatorem",
+        "data": {
+          "transport": "Typ połączenia"
+        }
+      },
+      "serial": {
+        "title": "USB / adapter RS485",
         "description": "Podaj parametry połączenia Modbus RTU (RS485 → USB)",
         "data": {
           "port": "Port szeregowy (np. /dev/ttyUSB0)",
           "slave": "Adres urządzenia Modbus (domyślnie: 10)",
           "baudrate": "Szybkość transmisji",
-          "transport": "Typ połączenia",
+          "has_gwc": "Instalacja posiada gruntowy wymiennik ciepła (GWC)"
+        }
+      },
+      "tcp": {
+        "title": "Ethernet — brama Modbus TCP",
+        "description": "Podaj adres bramki RS485 ↔ Ethernet i parametry Modbus",
+        "data": {
+          "host": "Adres IP bramki (np. 192.168.1.254)",
+          "tcp_port": "Port TCP (502 dla Modbus TCP)",
+          "framer": "Tryb protokołu",
+          "slave": "Adres urządzenia Modbus (domyślnie: 10)",
           "has_gwc": "Instalacja posiada gruntowy wymiennik ciepła (GWC)"
         }
       },

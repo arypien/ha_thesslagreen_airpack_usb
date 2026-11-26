@@ -13,9 +13,26 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import DEFAULT_BAUDRATE, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DEFAULT_SLAVE, DOMAIN, SUPPORTED_BAUDRATES
-from .modbus_client import get_serial_by_id
+from .modbus_client import (
+    DEFAULT_TCP_PORT,
+    FRAMER_AUTO,
+    TRANSPORT_SERIAL,
+    TRANSPORT_TCP,
+    get_serial_by_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+# Dropdown labels; values are what ends up in ConfigEntry.data.
+TRANSPORT_CHOICES = {
+    TRANSPORT_SERIAL: "USB / RS485 adapter (serial port)",
+    TRANSPORT_TCP: "Ethernet — Modbus TCP gateway (RS485↔ETH)",
+}
+FRAMER_CHOICES = {
+    FRAMER_AUTO: "Auto-detect (recommended)",
+    "socket": "Modbus TCP (MBAP) — gateway in Modbus TCP↔RTU mode",
+    "rtu": "Modbus RTU over TCP — gateway in transparent mode",
+}
 
 
 class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -28,11 +45,27 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_device: str | None = None
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
+        """Choose the connection type, then continue to that transport's step."""
+        if user_input is not None:
+            if user_input.get("transport") == TRANSPORT_TCP:
+                return await self.async_step_tcp()
+            return await self.async_step_serial()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("transport", default=TRANSPORT_SERIAL): vol.In(TRANSPORT_CHOICES),
+                }
+            ),
+        )
+
+    async def async_step_serial(self, user_input=None):
+        """Handle the serial (USB RS485 adapter) connection."""
         errors = {}
 
         if user_input is not None:
-            transport = user_input.get("transport", "serial")
+            transport = TRANSPORT_SERIAL
             try:
                 port = user_input["port"]
             except KeyError:
@@ -111,7 +144,6 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Fallback to manual entry
             data_schema = vol.Schema(
                 {
-                    vol.Required("transport"): vol.In(["serial"]),
                     vol.Required("port", default=DEFAULT_PORT): str,
                     vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
                     vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
@@ -121,7 +153,6 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         else:
             data_schema = vol.Schema(
                 {
-                    vol.Required("transport"): vol.In(["serial"]),
                     vol.Required("port"): vol.In(list_of_ports),
                     vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
                     vol.Required("baudrate", default=DEFAULT_BAUDRATE): vol.In(SUPPORTED_BAUDRATES),
@@ -130,7 +161,85 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="serial",
+            data_schema=data_schema,
+            errors=errors,
+        )
+
+    async def async_step_tcp(self, user_input=None):
+        """Handle the Modbus TCP connection (RS485↔Ethernet gateway)."""
+        errors = {}
+
+        if user_input is not None:
+            host = (user_input.get("host") or "").strip()
+            tcp_port = user_input.get("tcp_port", DEFAULT_TCP_PORT)
+            framer = user_input.get("framer", FRAMER_AUTO)
+            if not host:
+                errors["base"] = "cannot_connect"
+            else:
+                from .modbus_client import AirPackModbusClient
+
+                def try_connect():
+                    # Probe the gateway and report the framing it answered with.
+                    try:
+                        client = AirPackModbusClient(
+                            port=host,
+                            slave=user_input["slave"],
+                            transport=TRANSPORT_TCP,
+                            tcp_host=host,
+                            tcp_port=tcp_port,
+                            framer=framer,
+                            hass=self.hass,
+                        )
+                        try:
+                            if not client.connect():
+                                return None, None, None
+                            fw = client.get_firmware_version()
+                            model = client.get_device_name()
+                            return fw, model, client.framer_mode
+                        finally:
+                            client.close()
+                    except Exception:  # noqa: BLE001 - surface connection setup failure
+                        _LOGGER.exception("AirPack TCP probe failed at %s:%s", host, tcp_port)
+                        return None, None, None
+
+                fw, model, detected = await self.hass.async_add_executor_job(try_connect)
+                if fw is None:
+                    errors["base"] = "cannot_connect"
+                else:
+                    _LOGGER.info(
+                        "AirPack at %s:%s answered with %s framing (requested: %s)",
+                        host, tcp_port, detected, framer,
+                    )
+                    title = f"AirPack {model}" if model else f"AirPack Home ({host})"
+
+                    await self.async_set_unique_id(f"{host}:{tcp_port}_{user_input['slave']}")
+                    self._abort_if_unique_id_configured()
+
+                    return self.async_create_entry(
+                        title=title,
+                        data={
+                            "transport": TRANSPORT_TCP,
+                            "host": host,
+                            "tcp_port": tcp_port,
+                            "framer": framer,
+                            "slave": user_input["slave"],
+                            "has_gwc": user_input.get("has_gwc", False),
+                        },
+                    )
+
+        data_schema = vol.Schema(
+            {
+                vol.Required("host", default="192.168.1.254"): str,
+                vol.Required("tcp_port", default=DEFAULT_TCP_PORT): vol.All(int, vol.Range(min=1, max=65535)),
+                vol.Required("framer", default=FRAMER_AUTO): vol.In(FRAMER_CHOICES),
+                vol.Required("slave", default=DEFAULT_SLAVE): vol.All(int, vol.Range(min=1, max=247)),
+                vol.Required("has_gwc", default=False): bool,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="tcp",
             data_schema=data_schema,
             errors=errors,
         )
@@ -161,6 +270,7 @@ class AirPackConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             user_input["port"] = self._discovered_device
+            user_input["transport"] = TRANSPORT_SERIAL
             
             # Try to connect
             from .modbus_client import AirPackModbusClient

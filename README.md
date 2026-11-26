@@ -15,7 +15,7 @@ Integration for **Thesslagreen AirPack Home** heat recovery units (all h/v/f Ene
 
 ## Requirements
 - Home Assistant 2024.1.0+
-- RS485 → USB Adapter (e.g., CH340, FTDI, CP210x)
+- RS485 → USB adapter (e.g. CH340, FTDI, CP210x) **or** an RS485 ↔ Ethernet gateway (e.g. Waveshare RS485 TO ETH (B)) — see [Modbus TCP gateway](#modbus-tcp-gateway-rs485--ethernet)
 
 
 ## Installation via HACS
@@ -64,6 +64,47 @@ The card uses the integration's time.*, number.*, and select.* entities and auto
 ### Quick setup
 1. Connect the **A/B** data lines of the RS485 → USB adapter to the corresponding terminals on the unit.
 2. If the adapter is not detected, swap A and B (reversed polarity).
+
+## Modbus TCP gateway (RS485 ↔ Ethernet)
+
+Instead of a USB adapter you can use an RS485↔Ethernet gateway (e.g. **Waveshare RS485 TO ETH (B)**).
+The unit keeps speaking Modbus RTU; the gateway only bridges it to TCP.
+
+1. Wire the gateway's **A/B** terminals to the unit's RS485 **A/B** (swap them if there is no answer).
+2. Configure the gateway (web UI / Vircom):
+   - **Baud rate 9600, 8N1** — same as the unit,
+   - **Work mode**: either *Modbus TCP to RTU* (default) or *Transparent / TCP Server* — both are supported,
+   - note the **TCP port** (typically `502`).
+3. Settings → Devices & Services → **Add Integration** → **AirPack Home** → **Connection type: Ethernet — Modbus TCP gateway**.
+4. Enter the gateway **IP**, **TCP port**, **Protocol mode = Auto-detect**, and the **Modbus device address** (default `10`).
+
+Notes:
+- With *Auto-detect* the integration probes both framings (Modbus TCP/MBAP and RTU-over-TCP) and keeps the one that answers, so no manual mode juggling is needed.
+- Only one TCP connection should poll the unit: stop other Modbus masters pointed at the same gateway.
+- HTTP access to the gateway web UI can stay enabled; it does not interfere with port 502.
+
+### Checking the gateway before setup (optional)
+
+`tests/tcp_gateway_probe.py` is a standalone read-only probe — it uses the same client code as the integration, so a green result means the integration will connect too:
+
+```bash
+pip install "pymodbus==3.13.1" pyserial
+python tests/tcp_gateway_probe.py --host 192.168.1.254 --port 502
+```
+
+Sample output:
+
+```
+OK: connected to 192.168.1.254:502 in 0.12s
+    framing in use : socket
+    firmware       : 1.2.7
+    filter type    : 4
+    outside_temperature: 2.5
+    ...
+RESULT: 5/5 polls answered
+```
+
+`--framer socket` / `--framer rtu` force one mode; `--slave` and `--polls` adjust the device address and poll count.
 ---
 
 # AirPack Home – Integracja Home Assistant 🇵🇱
@@ -79,7 +120,7 @@ Integracja dla rekuperatorów **Thesslagreen AirPack Home** (wszystkie modele h/
 
 ## Wymagania
 - Home Assistant 2024.1.0+
-- Adapter RS485 → USB (np. CH340, FTDI, CP210x) podłączony do serwera HA
+- Adapter RS485 → USB (np. CH340, FTDI, CP210x) **lub** bramka RS485 ↔ Ethernet (np. Waveshare RS485 TO ETH (B)) — patrz [Bramka Modbus TCP](#bramka-modbus-tcp-rs485--ethernet) podłączony do serwera HA
 
 
 ## Instalacja przez HACS
@@ -129,6 +170,35 @@ Wszystko działa w oparciu o encje time.*, number.* i select.* udostępniane prz
 ### Szybkie podłączenie
 1. Podłącz linie **A/B** adaptera RS485 → USB do odpowiednich zacisków urządzenia.
 2. Gdy integracja nie wykrywa adaptera — zamień ze sobą A i B (odwrócona polaryzacja).
+
+## Bramka Modbus TCP (RS485 ↔ Ethernet)
+
+Zamiast adaptera USB można użyć bramki RS485↔Ethernet (np. **Waveshare RS485 TO ETH (B)**).
+Rekuperator nadal mówi po Modbus RTU — bramka tylko przenosi ruch do TCP.
+
+1. Podłącz zaciski **A/B** bramki do **A/B** RS485 rekuperatora (przy braku odpowiedzi zamień je miejscami).
+2. Skonfiguruj bramkę (web UI / Vircom):
+   - **Baudrate 9600, 8N1** — jak w rekuperatorze,
+   - **Tryb pracy**: *Modbus TCP to RTU* (domyślny) albo *Transparent / TCP Server* — oba są obsługiwane,
+   - zapisz **port TCP** (zwykle `502`).
+3. Ustawienia → Urządzenia i usługi → **Dodaj integrację** → **AirPack Home** → **Typ połączenia: Ethernet — bramka Modbus TCP**.
+4. Podaj **IP** bramki, **port TCP**, **Tryb protokołu = Auto-wykrywanie** oraz **adres Modbus urządzenia** (domyślnie `10`).
+
+Uwagi:
+- W trybie *Auto-wykrywanie* integracja sprawdza oba warianty ramkowania (Modbus TCP/MBAP oraz RTU-over-TCP) i zostaje przy tym, który odpowie — nie trzeba ręcznie zgadywać trybu bramki.
+- Z bramką powinien rozmawiać tylko jeden klient Modbus (zatrzymaj inne magistrale/mastery wskazane na ten sam port).
+- Web UI bramki może pozostać włączone — nie koliduje z portem 502.
+
+### Szybki test bramki (opcjonalnie)
+
+`tests/tcp_gateway_probe.py` to samodzielny test tylko-do-odczytu — używa tego samego klienta co integracja, więc zielony wynik oznacza, że integracja też się połączy:
+
+```bash
+pip install "pymodbus==3.13.1" pyserial
+python tests/tcp_gateway_probe.py --host 192.168.1.254 --port 502
+```
+
+Parametry `--framer socket` / `--framer rtu` wymuszają jeden tryb, `--slave` i `--polls` zmieniają adres urządzenia i liczbę odpytań.
 
 ## Entities / Encje
 

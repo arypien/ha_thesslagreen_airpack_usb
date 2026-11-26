@@ -17,7 +17,18 @@ sys.modules.setdefault("serial.tools.list_ports", serial_list_ports)
 
 pymodbus = types.ModuleType("pymodbus")
 pymodbus_client = types.ModuleType("pymodbus.client")
+
+
+class _FramerType:
+    """Minimal stand-in for pymodbus.FramerType."""
+
+    SOCKET = "socket"
+    RTU = "rtu"
+
+
+pymodbus.FramerType = _FramerType
 pymodbus_client.ModbusSerialClient = object
+pymodbus_client.ModbusTcpClient = object
 pymodbus.client = pymodbus_client
 pymodbus_exceptions = types.ModuleType("pymodbus.exceptions")
 pymodbus_exceptions.ModbusException = Exception

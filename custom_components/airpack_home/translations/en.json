@@ -3,12 +3,29 @@
     "step": {
       "user": {
         "title": "AirPack Home Setup",
+        "description": "Choose how the recuperator is connected",
+        "data": {
+          "transport": "Connection type"
+        }
+      },
+      "serial": {
+        "title": "USB / RS485 adapter",
         "description": "Enter Modbus RTU connection parameters (RS485 → USB)",
         "data": {
           "port": "Serial port (e.g. /dev/ttyUSB0)",
           "slave": "Modbus device address (default: 10)",
           "baudrate": "Baud rate",
-          "transport": "Connection type",
+          "has_gwc": "The installation has a ground heat exchanger (GWC)"
+        }
+      },
+      "tcp": {
+        "title": "Ethernet — Modbus TCP gateway",
+        "description": "Enter the gateway address and Modbus settings (RS485 ↔ Ethernet)",
+        "data": {
+          "host": "Gateway IP address (e.g. 192.168.1.254)",
+          "tcp_port": "TCP port (502 for Modbus TCP)",
+          "framer": "Protocol mode",
+          "slave": "Modbus device address (default: 10)",
           "has_gwc": "The installation has a ground heat exchanger (GWC)"
         }
       },
