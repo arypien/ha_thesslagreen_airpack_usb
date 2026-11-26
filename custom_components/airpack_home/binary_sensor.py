@@ -103,8 +103,20 @@ class AirPackBinarySensor(CoordinatorEntity, BinarySensorEntity):
             return {}
 
         data = self.coordinator.data
-        if not data or not bool(data.get(self._key)):
+        if not data:
             return {"active_alarms": [], "ambiguous_registers": []}
+
+        # Raw integers of the shared registers, always present when known: a value
+        # above 1 proves the register is a bitfield (each code has its own bit)
+        # instead of a single 0/1 "some alarm of this group" flag.
+        raw_values = {
+            f"raw_{address:04X}": data[f"raw_{address:04X}"]
+            for address in ADDRESS_ALIASES
+            if f"raw_{address:04X}" in data
+        }
+
+        if not bool(data.get(self._key)):
+            return {"active_alarms": [], "ambiguous_registers": [], **raw_values}
 
         prefix = "E" if self._key == "any_warning" else "S"
 
@@ -145,4 +157,4 @@ class AirPackBinarySensor(CoordinatorEntity, BinarySensorEntity):
                 key = keys[0]
                 active.append(f"{key}: {ALARM_REGISTERS[key]['name']}")
 
-        return {"active_alarms": active, "ambiguous_registers": ambiguous}
+        return {"active_alarms": active, "ambiguous_registers": ambiguous, **raw_values}

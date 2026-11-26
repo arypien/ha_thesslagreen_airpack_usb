@@ -90,6 +90,32 @@ class TestAirPackModbusClient(unittest.TestCase):
         self.assertEqual(calls, [(10, 2), (25, 1)])
         self.assertEqual(result, {"S1": True, "S2": True, "S3": True})
 
+    def test_shared_alarm_register_raw_value_is_exposed(self):
+        """A register carrying several codes keeps its raw integer (bitfield proof)."""
+        client = self.make_client()
+        client.read_holding_registers = lambda address, count=1: [4] * count  # bit 2
+        alarms = {
+            "E196": {"address": 0x20C6, "name": "a"},
+            "E197": {"address": 0x20C7, "name": "b"},
+            "E198": {"address": 0x20C6, "name": "c"},
+            "E199": {"address": 0x20C6, "name": "d"},
+        }
+        result = client.get_all_alarms(alarms)
+
+        self.assertEqual(result["raw_20C6"], 4)
+        # 0x20C7 is not shared (single code), so it must not add a raw key
+        self.assertNotIn("raw_20C7", result)
+        # boolean view stays as before
+        self.assertIs(result["E196"], True)
+        self.assertIs(result["E197"], True)
+
+    def test_unshared_alarms_have_no_raw_keys(self):
+        client = self.make_client()
+        client.read_holding_registers = lambda address, count=1: [1] * count
+        alarms = {"S2": {"address": 0x2002, "name": "x"}}
+        result = client.get_all_alarms(alarms)
+        self.assertEqual(result, {"S2": True})
+
     def test_schedule_settings_read_and_encode(self):
         client = self.make_client()
 

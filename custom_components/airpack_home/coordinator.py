@@ -13,6 +13,7 @@ from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    ADDRESS_ALIASES,
     ALARM_REGISTERS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -34,6 +35,8 @@ class AirPackCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._has_gwc = entry.options.get("has_gwc", entry.data.get("has_gwc", False))
         self._transport = entry.data.get("transport", TRANSPORT_SERIAL)
+        # Last raw value of each shared alarm register, to log a bitfield only once.
+        self._last_shared_raw: dict[int, int] = {}
         # Serial entries store the device path in "port"; TCP entries store the
         # gateway in "host" (+ optional "tcp_port").
         connection = entry.data.get("host") if self._transport == TRANSPORT_TCP else entry.data.get("port")
@@ -241,6 +244,20 @@ class AirPackCoordinator(DataUpdateCoordinator):
         # 13. Individual alarms (non-contiguous — read one by one)
         alarms = self._client.get_all_alarms(ALARM_REGISTERS)
         data.update(alarms)
+
+        # Shared alarm registers: a value above 1 means the register is a bitfield
+        # (one bit per code), not a single "some alarm of this group" flag. Logged
+        # so the mapping can be settled from a real fault instead of guesswork.
+        for address in ADDRESS_ALIASES:
+            raw = alarms.get(f"raw_{address:04X}")
+            if isinstance(raw, int) and raw > 1 and raw != self._last_shared_raw.get(address):
+                _LOGGER.warning(
+                    "AirPack: shared alarm register 0x%04X reads %d (binary %s) — "
+                    "looks like a bitfield, please report the alarm code shown on the unit",
+                    address, raw, format(raw, "b"),
+                )
+            if isinstance(raw, int):
+                self._last_shared_raw[address] = raw
 
         # 14. Antifreeze
         af_regs = self._client.read_holding_registers(0x1060, 1)

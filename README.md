@@ -263,6 +263,10 @@ All alarm entities use the **Problem** device class.
 
 Wszystkie encje alarmowe korzystają z klasy urządzenia **Problem**.
 
+The two global flags (`Aktywne ostrzeżenie (E)` / `Aktywny błąd (S)`) carry extra attributes: `active_alarms` (which codes are on), `ambiguous_registers` (shared registers, where one flag covers several codes) and `raw_20C6` (the raw integer of such a register — a value above 1 proves the register is a bitfield).
+
+Dwie encje zbiorcze (`Aktywne ostrzeżenie (E)` / `Aktywny błąd (S)`) mają dodatkowe atrybuty: `active_alarms` (które kody są aktywne), `ambiguous_registers` (rejestry wspólne, gdzie jedna flaga obejmuje kilka kodów) oraz `raw_20C6` (surowa wartość takiego rejestru — wartość większa od 1 dowodzi, że to bitfield).
+
 
 ## License / Licencja
 MIT

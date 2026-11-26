@@ -649,7 +649,7 @@ class AirPackModbusClient:
             return None
         return {"any_warning": regs[0], "any_error": regs[1]}
 
-    def get_all_alarms(self, alarm_registers: dict) -> dict[str, bool]:
+    def get_all_alarms(self, alarm_registers: dict) -> dict[str, bool | int]:
         """Read alarm registers, merging only TRULY consecutive registers into single RTU requests.
 
         The AirPack S-error register map is SPARSE (0x2002..0x2020 has holes where S3/S4/S5,
@@ -657,8 +657,18 @@ class AirPackModbusClient:
         makes the unit answer with Modbus Exception 0x04 (Server Device Failure) and the whole
         read fails. Merging ONLY gap-free runs keeps E-type blocks batched (they are contiguous)
         while every isolated S register is read individually.
+
+        Registers that carry more than one alarm code (see ADDRESS_ALIASES) also return their
+        raw integer as ``raw_<ADDRESS>``: the boolean view cannot tell a plain 0/1 flag from a
+        bitfield, and only the raw value decides that.
         """
-        result = {key: False for key in alarm_registers}
+        result: dict[str, bool | int] = {key: False for key in alarm_registers}
+
+        counts: dict[int, int] = {}
+        for reg in alarm_registers.values():
+            counts[reg["address"]] = counts.get(reg["address"], 0) + 1
+        shared_addresses = {address for address, count in counts.items() if count > 1}
+
         ordered = sorted(alarm_registers.items(), key=lambda item: item[1]["address"])
         index = 0
         while index < len(ordered):
@@ -680,6 +690,10 @@ class AirPackModbusClient:
                     offset = reg["address"] - start
                     if offset < len(regs):
                         result[key] = bool(regs[offset])
+                for address in shared_addresses:
+                    offset = address - start
+                    if 0 <= offset < len(regs):
+                        result[f"raw_{address:04X}"] = regs[offset]
         return result
 
     def reset_alarm(self, address: int) -> bool:
