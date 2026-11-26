@@ -158,6 +158,14 @@ HOLDING_REGISTERS = {
 }
 
 # ─── ALARM REGISTERS (03 holding, read/write) ────────────────────────────────
+# ADDRESS_ALIASES: registers the device protocol assigns to more than one alarm
+# code. The unit reports a single flag bit for the whole group, so a raised flag
+# does NOT identify which code fired. Source: MODBUS_USER_AirPack_Home 08.2021.01
+# §4.85/4.80 lists E196, E197, E198 and E199 all at address 0x20C6.
+ADDRESS_ALIASES: dict[int, list[str]] = {
+    0x20C6: ["E196", "E197", "E198", "E199"],
+}
+
 ALARM_REGISTERS = {
     # S-type (blocking)
     "S2":  {"address": 0x2002, "name": "Błąd komunikacji I2C"},
