@@ -1,4 +1,4 @@
-"""Modbus RTU client for AirPack Home."""
+"""Modbus client for AirPack Home (RTU over USB serial, or Modbus TCP gateway)."""
 from __future__ import annotations
 
 import asyncio
@@ -7,7 +7,8 @@ import os
 from typing import Any
 
 import serial.tools.list_ports
-from pymodbus.client import ModbusSerialClient
+from pymodbus import FramerType
+from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from .schedule_helpers import decode_aatt, decode_hhmm, encode_aatt, encode_hhmm
@@ -16,6 +17,23 @@ from .const import SCHEDULE_DAYS, SCHEDULE_PERIODS
 _LOGGER = logging.getLogger(__name__)
 
 NO_READING_VALUE = 0x8000  # sensor not connected / no reading
+
+# ── transports ───────────────────────────────────────────────────────────────
+TRANSPORT_SERIAL = "serial"
+TRANSPORT_TCP = "tcp"
+
+# Framer modes for the TCP transport:
+#   "socket" = Modbus TCP (MBAP header) — gateway in "Modbus TCP ↔ RTU" mode, port 502
+#   "rtu"    = Modbus RTU framed inside a raw TCP stream — gateway in transparent/RTU-over-TCP mode
+#   "auto"   = probe both, remember the one that answered
+FRAMER_SOCKET = "socket"
+FRAMER_RTU = "rtu"
+FRAMER_AUTO = "auto"
+TCP_FRAMERS = (FRAMER_AUTO, FRAMER_SOCKET, FRAMER_RTU)
+
+DEFAULT_TCP_PORT = 502
+PROBE_TIMEOUT = 2.0  # seconds, used only while auto-detecting the gateway mode
+RUNTIME_TIMEOUT = 3.0  # seconds, used for the polling client
 
 
 def _crc16(data: bytes) -> int:
@@ -129,25 +147,114 @@ def get_serial_by_id(dev_path: str) -> str:
 
 
 class AirPackModbusClient:
-    """Thin wrapper around pymodbus serial client."""
+    """Thin wrapper around a pymodbus transport (serial RTU or Modbus TCP)."""
 
-    def __init__(self, port: str, slave: int, baudrate: int = 9600, hass=None) -> None:
-        self._port = get_serial_by_id(port)
+    def __init__(
+        self,
+        port: str,
+        slave: int,
+        baudrate: int = 9600,
+        hass=None,
+        transport: str = TRANSPORT_SERIAL,
+        tcp_host: str | None = None,
+        tcp_port: int = DEFAULT_TCP_PORT,
+        framer: str = FRAMER_AUTO,
+    ) -> None:
+        self._transport = transport if transport in (TRANSPORT_SERIAL, TRANSPORT_TCP) else TRANSPORT_SERIAL
         self._slave = slave
-        self._client = ModbusSerialClient(
-            port=self._port,
-            baudrate=baudrate,
-            bytesize=8,
-            parity="N",
-            stopbits=1,
-            timeout=3,
+        self._framer_mode = framer if framer in (FRAMER_SOCKET, FRAMER_RTU, FRAMER_AUTO) else FRAMER_AUTO
+        self._client: Any = None
+
+        if self._transport == TRANSPORT_TCP:
+            # `port` carries the host for the TCP transport, so callers that only
+            # know one connection string still work.
+            self._host = (tcp_host or port or "").strip()
+            self._tcp_port = int(tcp_port or DEFAULT_TCP_PORT)
+            self._port = f"{self._host}:{self._tcp_port}"
+            if self._framer_mode != FRAMER_AUTO:
+                self._client = self._make_tcp_client(self._framer_mode)
+        else:
+            self._port = get_serial_by_id(port)
+            self._client = ModbusSerialClient(
+                port=self._port,
+                baudrate=baudrate,
+                bytesize=8,
+                parity="N",
+                stopbits=1,
+                timeout=3,
+            )
+
+    # ── TCP transport helpers ────────────────────────────────────────────────
+
+    def _make_tcp_client(self, mode: str, timeout: float = RUNTIME_TIMEOUT, retries: int = 3):
+        """Build a Modbus TCP client for the given framer mode."""
+        pymodbus_framer = FramerType.SOCKET if mode == FRAMER_SOCKET else FramerType.RTU
+        return ModbusTcpClient(
+            host=self._host,
+            port=self._tcp_port,
+            framer=pymodbus_framer,
+            timeout=timeout,
+            retries=retries,
         )
 
+    def _probe(self, client) -> bool:
+        """Return True when the client answers a real Modbus read."""
+        try:
+            if not client.connect():
+                return False
+            result = client.read_input_registers(0x0000, count=1, device_id=self._slave)
+            return not result.isError()
+        except Exception as exc:  # noqa: BLE001 - any transport error means "not this mode"
+            _LOGGER.debug("AirPack TCP probe failed: %s", exc)
+            return False
+
     def connect(self) -> bool:
-        return self._client.connect()
+        if self._transport != TRANSPORT_TCP:
+            return self._client.connect()
+
+        if self._framer_mode != FRAMER_AUTO:
+            return bool(self._client.connect())
+
+        # Auto-detect the gateway mode. A successful TCP handshake is not enough:
+        # a transparent gateway accepts the socket but never answers MBAP frames,
+        # so the probe must perform a real read.
+        for mode in (FRAMER_SOCKET, FRAMER_RTU):
+            candidate = self._make_tcp_client(mode, timeout=PROBE_TIMEOUT, retries=1)
+            if self._probe(candidate):
+                try:
+                    candidate.close()
+                except Exception:  # noqa: BLE001 - closing a dead socket must not raise
+                    pass
+                # Runtime client: longer timeout, single retry so a poll never hangs.
+                self._client = self._make_tcp_client(mode, retries=1)
+                self._framer_mode = mode
+                _LOGGER.info("AirPack TCP gateway at %s detected using %s framing", self._port, mode)
+                return True
+            try:
+                candidate.close()
+            except Exception:  # noqa: BLE001 - closing a dead socket must not raise
+                pass
+
+        # Keep a working object so later reads return None instead of AttributeError.
+        self._client = self._make_tcp_client(FRAMER_SOCKET)
+        return False
+
+    @property
+    def transport(self) -> str:
+        return self._transport
+
+    @property
+    def framer_mode(self) -> str:
+        """Resolved framer mode ("socket" or "rtu" once auto-detection ran)."""
+        return self._framer_mode
 
     def close(self) -> None:
-        self._client.close()
+        if self._client is None:
+            return
+        try:
+            self._client.close()
+        except Exception:  # noqa: BLE001 - shutdown must never raise
+            pass
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -167,7 +274,10 @@ class AirPackModbusClient:
 
     def read_coils(self, address: int, count: int = 1) -> list[bool] | None:
         try:
-            result = self._client.read_coils(address, count=count, device_id=self._slave)
+            client = self._client
+            if client is None:  # not connected yet (e.g. gateway down at setup)
+                return None
+            result = client.read_coils(address, count=count, device_id=self._slave)
             if result.isError():
                 return None
             return result.bits[:count]
@@ -177,7 +287,10 @@ class AirPackModbusClient:
 
     def read_discrete_inputs(self, address: int, count: int = 1) -> list[bool] | None:
         try:
-            result = self._client.read_discrete_inputs(address, count=count, device_id=self._slave)
+            client = self._client
+            if client is None:  # not connected yet (e.g. gateway down at setup)
+                return None
+            result = client.read_discrete_inputs(address, count=count, device_id=self._slave)
             if result.isError():
                 return None
             return result.bits[:count]
@@ -187,7 +300,10 @@ class AirPackModbusClient:
 
     def read_holding_registers(self, address: int, count: int = 1) -> list[int] | None:
         try:
-            result = self._client.read_holding_registers(address, count=count, device_id=self._slave)
+            client = self._client
+            if client is None:  # not connected yet (e.g. gateway down at setup)
+                return None
+            result = client.read_holding_registers(address, count=count, device_id=self._slave)
             if result.isError():
                 return None
             return result.registers
@@ -197,7 +313,10 @@ class AirPackModbusClient:
 
     def read_input_registers(self, address: int, count: int = 1) -> list[int] | None:
         try:
-            result = self._client.read_input_registers(address, count=count, device_id=self._slave)
+            client = self._client
+            if client is None:  # not connected yet (e.g. gateway down at setup)
+                return None
+            result = client.read_input_registers(address, count=count, device_id=self._slave)
             if result.isError():
                 return None
             return result.registers
@@ -207,7 +326,10 @@ class AirPackModbusClient:
 
     def write_register(self, address: int, value: int) -> bool:
         try:
-            result = self._client.write_register(address, value, device_id=self._slave)
+            client = self._client
+            if client is None:  # not connected yet (e.g. gateway down at setup)
+                return False
+            result = client.write_register(address, value, device_id=self._slave)
         except ModbusException as exc:
             _LOGGER.error("Register write error @ 0x%04X: %s", address, exc)
             return False
@@ -219,7 +341,10 @@ class AirPackModbusClient:
     def write_registers(self, address: int, values: list[int]) -> bool:
         """Write multiple registers in one operation."""
         try:
-            result = self._client.write_registers(address, values, device_id=self._slave)
+            client = self._client
+            if client is None:  # not connected yet (e.g. gateway down at setup)
+                return False
+            result = client.write_registers(address, values, device_id=self._slave)
         except ModbusException as exc:
             _LOGGER.error("Registers write error @ 0x%04X: %s", address, exc)
             return False
@@ -524,7 +649,7 @@ class AirPackModbusClient:
             return None
         return {"any_warning": regs[0], "any_error": regs[1]}
 
-    def get_all_alarms(self, alarm_registers: dict) -> dict[str, bool]:
+    def get_all_alarms(self, alarm_registers: dict) -> dict[str, bool | int]:
         """Read alarm registers, merging only TRULY consecutive registers into single RTU requests.
 
         The AirPack S-error register map is SPARSE (0x2002..0x2020 has holes where S3/S4/S5,
@@ -532,8 +657,18 @@ class AirPackModbusClient:
         makes the unit answer with Modbus Exception 0x04 (Server Device Failure) and the whole
         read fails. Merging ONLY gap-free runs keeps E-type blocks batched (they are contiguous)
         while every isolated S register is read individually.
+
+        Registers that carry more than one alarm code (see ADDRESS_ALIASES) also return their
+        raw integer as ``raw_<ADDRESS>``: the boolean view cannot tell a plain 0/1 flag from a
+        bitfield, and only the raw value decides that.
         """
-        result = {key: False for key in alarm_registers}
+        result: dict[str, bool | int] = {key: False for key in alarm_registers}
+
+        counts: dict[int, int] = {}
+        for reg in alarm_registers.values():
+            counts[reg["address"]] = counts.get(reg["address"], 0) + 1
+        shared_addresses = {address for address, count in counts.items() if count > 1}
+
         ordered = sorted(alarm_registers.items(), key=lambda item: item[1]["address"])
         index = 0
         while index < len(ordered):
@@ -555,6 +690,10 @@ class AirPackModbusClient:
                     offset = reg["address"] - start
                     if offset < len(regs):
                         result[key] = bool(regs[offset])
+                for address in shared_addresses:
+                    offset = address - start
+                    if 0 <= offset < len(regs):
+                        result[f"raw_{address:04X}"] = regs[offset]
         return result
 
     def reset_alarm(self, address: int) -> bool:

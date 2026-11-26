@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import timedelta
 
 from datetime import datetime
@@ -12,11 +13,18 @@ from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    ADDRESS_ALIASES,
     ALARM_REGISTERS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
-from .modbus_client import AirPackModbusClient
+from .modbus_client import (
+    DEFAULT_TCP_PORT,
+    FRAMER_AUTO,
+    TRANSPORT_SERIAL,
+    TRANSPORT_TCP,
+    AirPackModbusClient,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,31 +34,70 @@ class AirPackCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._has_gwc = entry.options.get("has_gwc", entry.data.get("has_gwc", False))
+        self._transport = entry.data.get("transport", TRANSPORT_SERIAL)
+        # Last raw value of each shared alarm register, to log a bitfield only once.
+        self._last_shared_raw: dict[int, int] = {}
+        # Serial entries store the device path in "port"; TCP entries store the
+        # gateway in "host" (+ optional "tcp_port").
+        connection = entry.data.get("host") if self._transport == TRANSPORT_TCP else entry.data.get("port")
         self._client = AirPackModbusClient(
-            port=entry.data["port"],
+            port=connection or entry.data.get("port", ""),
             slave=entry.data.get("slave", 10),
             baudrate=entry.data.get("baudrate", 9600),
             hass=hass,
+            transport=self._transport,
+            tcp_host=entry.data.get("host"),
+            tcp_port=entry.data.get("tcp_port", DEFAULT_TCP_PORT),
+            framer=entry.data.get("framer", FRAMER_AUTO),
         )
-        self._client.connect()
+        # The connection is established off the event loop (TCP auto-detection can
+        # block for seconds), so keep it lazy and guarded.
+        self._connected = False
+        self._connect_lock = threading.Lock()
 
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=entry.options.get("scan_interval", DEFAULT_SCAN_INTERVAL)),
         )
 
         # Sync time on startup
-        hass.async_add_executor_job(self._client.set_datetime_now)
+        hass.async_add_executor_job(self._startup_sync)
 
         # Sync time daily at 03:00
         self._unsub_time_sync = async_track_time_change(
             hass, self._async_sync_time, hour=3, minute=0, second=0
         )
 
+    def _ensure_connected(self) -> bool:
+        """Connect once (thread-safe); must be called from an executor thread."""
+        if self._connected:
+            return True
+        with self._connect_lock:
+            if self._connected:
+                return True
+            try:
+                self._connected = bool(self._client.connect())
+            except Exception as exc:  # noqa: BLE001 - surfaced as UpdateFailed later
+                _LOGGER.error("AirPack connection to %s failed: %s", self._client._port, exc)
+                self._connected = False
+            if self._connected and self._transport == TRANSPORT_TCP:
+                _LOGGER.info(
+                    "AirPack connected over Modbus TCP at %s (%s framing)",
+                    self._client._port,
+                    self._client.framer_mode,
+                )
+            return self._connected
+
+    def _startup_sync(self) -> None:
+        """Initial device clock sync (runs in a worker thread)."""
+        self._ensure_connected()
+        self._client.set_datetime_now()
+
     async def _async_sync_time(self, now=None) -> None:
-        await self.hass.async_add_executor_job(self._client.set_datetime_now)
+        await self.hass.async_add_executor_job(self._startup_sync)
         _LOGGER.debug("AirPack: auto-synced device clock at 03:00")
 
     def close(self) -> None:
@@ -68,6 +115,8 @@ class AirPackCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict:
         """Fetch all data from the device."""
+        if not await self.hass.async_add_executor_job(self._ensure_connected):
+            raise UpdateFailed(f"AirPack not reachable at {self._client._port}")
         try:
             data = await self.hass.async_add_executor_job(self._fetch_all)
         except Exception as exc:
@@ -195,6 +244,20 @@ class AirPackCoordinator(DataUpdateCoordinator):
         # 13. Individual alarms (non-contiguous — read one by one)
         alarms = self._client.get_all_alarms(ALARM_REGISTERS)
         data.update(alarms)
+
+        # Shared alarm registers: a value above 1 means the register is a bitfield
+        # (one bit per code), not a single "some alarm of this group" flag. Logged
+        # so the mapping can be settled from a real fault instead of guesswork.
+        for address in ADDRESS_ALIASES:
+            raw = alarms.get(f"raw_{address:04X}")
+            if isinstance(raw, int) and raw > 1 and raw != self._last_shared_raw.get(address):
+                _LOGGER.warning(
+                    "AirPack: shared alarm register 0x%04X reads %d (binary %s) — "
+                    "looks like a bitfield, please report the alarm code shown on the unit",
+                    address, raw, format(raw, "b"),
+                )
+            if isinstance(raw, int):
+                self._last_shared_raw[address] = raw
 
         # 14. Antifreeze
         af_regs = self._client.read_holding_registers(0x1060, 1)
